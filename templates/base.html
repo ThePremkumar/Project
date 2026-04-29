@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}CyberSentinel{% endblock %} — ICTDS</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #0A0E2A;
+    --bg2:     #0D1B3E;
+    --bg3:     #122150;
+    --card:    #162245;
+    --border:  #1E3A6E;
+    --accent:  #00C8FF;
+    --green:   #00E5A0;
+    --red:     #FF4D6D;
+    --amber:   #FFAA00;
+    --purple:  #7B5EA7;
+    --text:    #E2E8F0;
+    --muted:   #94A3B8;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    width: 240px; min-height: 100vh; background: var(--bg2);
+    border-right: 1px solid var(--border);
+    position: fixed; top: 0; left: 0; z-index: 100;
+    display: flex; flex-direction: column;
+  }
+  .sidebar-brand {
+    padding: 20px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .sidebar-brand .logo-icon {
+    width: 36px; height: 36px; background: var(--accent);
+    border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--bg);
+  }
+  .sidebar-brand h6 { margin: 0; font-size: 14px; font-weight: 700; color: var(--accent); line-height: 1.2; }
+  .sidebar-brand small { color: var(--muted); font-size: 10px; }
+  .nav-section { padding: 16px 12px 4px; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+  .sidebar .nav-link {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px; color: var(--muted); border-radius: 8px; margin: 2px 8px;
+    font-size: 13px; transition: all .2s;
+  }
+  .sidebar .nav-link i { width: 16px; text-align: center; font-size: 14px; }
+  .sidebar .nav-link:hover, .sidebar .nav-link.active {
+    background: rgba(0,200,255,.1); color: var(--accent);
+  }
+  .sidebar-footer { margin-top: auto; padding: 16px; border-top: 1px solid var(--border); }
+  .user-pill { display: flex; align-items: center; gap: 8px; }
+  .user-avatar {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--bg3);
+    border: 2px solid var(--accent); display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: var(--accent); font-weight: 700;
+  }
+  .user-pill small { color: var(--muted); font-size: 11px; }
+
+  /* Main content */
+  .main-content { margin-left: 240px; padding: 28px; min-height: 100vh; }
+
+  /* Topbar */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .page-title { font-size: 22px; font-weight: 700; color: var(--text); }
+  .page-title span { color: var(--accent); }
+  .live-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--green);
+    background: rgba(0,229,160,.08); border: 1px solid rgba(0,229,160,.2); border-radius: 20px; padding: 4px 12px; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,229,160,.4)} 50%{opacity:.8;box-shadow:0 0 0 5px rgba(0,229,160,0)} }
+
+  /* Cards */
+  .cyber-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  }
+  .metric-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px;
+    position: relative; overflow: hidden;
+  }
+  .metric-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+  .metric-card.accent::before { background: var(--accent); }
+  .metric-card.danger::before { background: var(--red); }
+  .metric-card.success::before { background: var(--green); }
+  .metric-card.warning::before { background: var(--amber); }
+  .metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .metric-val { font-size: 30px; font-weight: 700; line-height: 1; }
+  .metric-val.accent { color: var(--accent); }
+  .metric-val.danger { color: var(--red); }
+  .metric-val.success { color: var(--green); }
+  .metric-val.warning { color: var(--amber); }
+  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+  /* Table */
+  .cyber-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .cyber-table th { color: var(--muted); padding: 8px 12px; border-bottom: 1px solid var(--border);
+    text-align: left; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+  .cyber-table td { padding: 9px 12px; border-bottom: 1px solid rgba(30,58,110,.4); }
+  .cyber-table tr:last-child td { border-bottom: none; }
+  .cyber-table tr:hover td { background: rgba(0,200,255,.03); }
+
+  /* Badges */
+  .badge-threat { padding: 3px 9px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+  .b-normal  { background: rgba(0,229,160,.12); color: #00E5A0; border: 1px solid rgba(0,229,160,.25); }
+  .b-dos     { background: rgba(255,77,109,.12); color: #FF4D6D; border: 1px solid rgba(255,77,109,.25); }
+  .b-probe   { background: rgba(255,170,0,.12);  color: #FFAA00; border: 1px solid rgba(255,170,0,.25); }
+  .b-r2l     { background: rgba(255,77,109,.12); color: #FF4D6D; border: 1px solid rgba(255,77,109,.25); }
+  .b-u2r     { background: rgba(255,77,109,.18); color: #FF4D6D; border: 1px solid rgba(255,77,109,.4); }
+
+  /* Buttons */
+  .btn-cyber {
+    background: transparent; border: 1px solid var(--accent); color: var(--accent);
+    padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    transition: all .2s; cursor: pointer;
+  }
+  .btn-cyber:hover { background: rgba(0,200,255,.1); color: var(--accent); }
+  .btn-cyber-solid {
+    background: var(--accent); border: 1px solid var(--accent); color: var(--bg);
+    padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    transition: all .2s; cursor: pointer;
+  }
+  .btn-cyber-solid:hover { background: #00a8db; color: var(--bg); }
+
+  /* Alert flash */
+  .flash-msg { border-radius: 8px; font-size: 13px; padding: 10px 16px; margin-bottom: 16px; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 12px; padding: 48px 24px;
+    text-align: center; cursor: pointer; transition: all .25s;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: rgba(0,200,255,.04); }
+  .upload-zone i { font-size: 40px; color: var(--muted); margin-bottom: 12px; display: block; }
+
+  /* Threat row highlight */
+  .row-threat td { background: rgba(255,77,109,.04) !important; }
+  .row-normal td { background: rgba(0,229,160,.03) !important; }
+
+  /* Progress bar */
+  .cyber-progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  .cyber-progress-fill { height: 100%; border-radius: 3px; transition: width 1s ease; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+{% if session.user_id %}
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+    <div>
+      <h6>CyberSentinel</h6>
+      <small>ICTDS v1.0</small>
+    </div>
+  </div>
+
+  <div class="nav-section">Main</div>
+  <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint=='dashboard' %}active{% endif %}">
+    <i class="fas fa-chart-line"></i> Dashboard
+  </a>
+  <a href="{{ url_for('analyse') }}" class="nav-link {% if request.endpoint=='analyse' %}active{% endif %}">
+    <i class="fas fa-magnifying-glass-chart"></i> Analyse Traffic
+  </a>
+  <a href="{{ url_for('logs') }}" class="nav-link {% if request.endpoint=='logs' %}active{% endif %}">
+    <i class="fas fa-list-check"></i> Detection Logs
+  </a>
+
+  <div class="nav-section">Quick</div>
+  <a href="{{ url_for('demo') }}" class="nav-link">
+    <i class="fas fa-bolt"></i> Run Demo
+  </a>
+  <a href="{{ url_for('sample_csv') }}" class="nav-link">
+    <i class="fas fa-download"></i> Sample CSV
+  </a>
+
+  <div class="sidebar-footer">
+    <div class="user-pill">
+      <div class="user-avatar">{{ session.username[0].upper() }}</div>
+      <div>
+        <div style="font-size:12px;font-weight:600;">{{ session.username }}</div>
+        <small>Analyst</small>
+      </div>
+      <a href="{{ url_for('logout') }}" class="ms-auto" style="color:var(--muted);font-size:14px;" title="Logout">
+        <i class="fas fa-right-from-bracket"></i>
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Main -->
+<div class="{{ 'main-content' if session.user_id else '' }}">
+
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, msg in msgs %}
+      <div class="flash-msg alert alert-{{ 'danger' if cat=='danger' else 'success' if cat=='success' else 'info' if cat=='info' else 'warning' }}">
+        <i class="fas fa-{{ 'circle-xmark' if cat=='danger' else 'circle-check' if cat=='success' else 'circle-info' if cat=='info' else 'triangle-exclamation' }} me-2"></i>{{ msg }}
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

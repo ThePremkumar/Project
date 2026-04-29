@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Analyse Traffic{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <div class="page-title">Analyse <span>Traffic</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Upload a CSV network log file for ML-based threat classification</div>
+  </div>
+  <a href="{{ url_for('sample_csv') }}" class="btn-cyber" style="font-size:12px;padding:6px 14px;">
+    <i class="fas fa-download me-1"></i>Download Sample CSV
+  </a>
+</div>
+
+<!-- Upload card -->
+<div class="row g-3 mb-4">
+  <div class="col-md-7">
+    <div class="cyber-card">
+      <h6 style="color:var(--accent);margin-bottom:20px;font-size:13px;">
+        <i class="fas fa-upload me-2"></i>Upload Network Log File
+      </h6>
+      <form method="POST" enctype="multipart/form-data" id="upload-form">
+        <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
+          <i class="fas fa-file-csv"></i>
+          <div style="font-size:15px;color:var(--text);font-weight:600;margin-bottom:6px;">
+            Drop CSV file here or click to browse
+          </div>
+          <div style="font-size:12px;color:var(--muted);">Accepted format: .csv with network traffic features</div>
+          <div id="file-name" style="margin-top:10px;font-size:12px;color:var(--accent);display:none;"></div>
+        </div>
+        <input type="file" name="csv_file" id="csv-input" accept=".csv" style="display:none;" onchange="showFileName(this)">
+        <button type="submit" class="btn-cyber-solid w-100 mt-3" id="submit-btn" style="display:none;">
+          <i class="fas fa-magnifying-glass-chart me-2"></i>Analyse Traffic
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-md-5">
+    <div class="cyber-card" style="height:100%;">
+      <h6 style="color:var(--accent);margin-bottom:16px;font-size:13px;">
+        <i class="fas fa-circle-info me-2"></i>Expected CSV Columns
+      </h6>
+      <div style="font-size:11px;color:var(--muted);line-height:1.9;">
+        <code style="color:var(--accent);">protocol_type</code>, 
+        <code style="color:var(--accent);">service</code>, 
+        <code style="color:var(--accent);">flag</code>, 
+        <code style="color:var(--accent);">src_bytes</code>, 
+        <code style="color:var(--accent);">dst_bytes</code>, 
+        <code style="color:var(--accent);">duration</code>, 
+        <code style="color:var(--accent);">count</code>, 
+        <code style="color:var(--accent);">serror_rate</code>, 
+        <code style="color:var(--accent);">rerror_rate</code>, 
+        <code style="color:var(--accent);">same_srv_rate</code>
+        <span style="color:var(--muted);"> + 32 more network features</span>
+      </div>
+      <div style="margin-top:16px;padding:10px 14px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--accent);">
+        <div style="font-size:11px;color:var(--muted);">Based on NSL-KDD / CIC-IDS 2017 dataset schema.</div>
+        <a href="{{ url_for('sample_csv') }}" style="font-size:11px;color:var(--accent);text-decoration:none;">
+          <i class="fas fa-download me-1"></i>Download sample CSV to get started
+        </a>
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--green);">
+        <div style="font-size:11px;color:var(--muted);">
+          <i class="fas fa-bolt me-1" style="color:var(--green);"></i>
+          Want instant results? <a href="{{ url_for('demo') }}" style="color:var(--green);">Run the demo</a> — analyses 20 synthetic packets immediately.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if results %}
+<!-- Summary cards -->
+<div class="row g-3 mb-3">
+  <div class="col">
+    <div class="metric-card accent">
+      <div class="metric-label">Total Records</div>
+      <div class="metric-val accent">{{ summary.total }}</div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="metric-card danger">
+      <div class="metric-label">Threats Found</div>
+      <div class="metric-val danger">{{ summary.threats }}</div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="metric-card success">
+      <div class="metric-label">Safe Traffic</div>
+      <div class="metric-val success">{{ summary.safe }}</div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="metric-card warning">
+      <div class="metric-label">Threat Rate</div>
+      <div class="metric-val warning">{{ summary.threat_pct }}%</div>
+    </div>
+  </div>
+</div>
+
+<!-- Results table -->
+<div class="cyber-card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div style="font-size:13px;font-weight:600;color:var(--accent);">
+      <i class="fas fa-table me-2"></i>Classification Results — {{ filename }}
+    </div>
+    <div style="display:flex;gap:8px;font-size:11px;">
+      <span style="background:rgba(0,229,160,.1);color:var(--green);border:1px solid rgba(0,229,160,.2);border-radius:4px;padding:2px 8px;">
+        <i class="fas fa-circle-check me-1"></i>Normal: {{ summary.by_type.get('normal', 0) }}
+      </span>
+      {% for k,v in summary.by_type.items() %}
+        {% if k != 'normal' %}
+        <span style="background:rgba(255,77,109,.1);color:var(--red);border:1px solid rgba(255,77,109,.2);border-radius:4px;padding:2px 8px;">
+          <i class="fas fa-triangle-exclamation me-1"></i>{{ k.upper() }}: {{ v }}
+        </span>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div style="max-height:420px;overflow-y:auto;">
+    <table class="cyber-table">
+      <thead style="position:sticky;top:0;background:var(--card);">
+        <tr><th>#</th><th>Prediction</th><th>Confidence</th><th>Severity</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+      {% for i, row in enumerate(results) %}
+        <tr class="{{ 'row-threat' if row.is_threat else 'row-normal' }}">
+          <td style="color:var(--muted);">{{ i + 1 }}</td>
+          <td>
+            <span class="badge-threat b-{{ row.prediction }}">{{ row.prediction.upper() }}</span>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <div style="flex:1;background:var(--border);border-radius:3px;height:4px;min-width:70px;">
+                <div style="height:100%;border-radius:3px;width:{{ row.confidence }}%;background:{{ '#FF4D6D' if row.is_threat else '#00E5A0' }};"></div>
+              </div>
+              <span style="font-size:11px;color:var(--muted);min-width:36px;">{{ row.confidence }}%</span>
+            </div>
+          </td>
+          <td>
+            <span style="font-size:11px;color:{{ '#FF4D6D' if row.severity in ('High','Critical') else '#FFAA00' if row.severity=='Medium' else '#00E5A0' }};">
+              {{ row.severity }}
+            </span>
+          </td>
+          <td>
+            {% if row.is_threat %}
+            <span style="font-size:10px;color:var(--red);"><i class="fas fa-triangle-exclamation me-1"></i>THREAT</span>
+            {% else %}
+            <span style="font-size:10px;color:var(--green);"><i class="fas fa-circle-check me-1"></i>SAFE</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dropZone = document.getElementById('drop-zone');
+const input    = document.getElementById('csv-input');
+const submitBtn= document.getElementById('submit-btn');
+
+function showFileName(inp) {
+  if (inp.files.length) {
+    document.getElementById('file-name').style.display = 'block';
+    document.getElementById('file-name').textContent   = inp.files[0].name;
+    submitBtn.style.display = 'block';
+    dropZone.style.borderColor = 'var(--accent)';
+  }
+}
+
+['dragover','dragenter'].forEach(e => dropZone.addEventListener(e, ev => {
+  ev.preventDefault(); dropZone.classList.add('drag');
+}));
+['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => {
+  ev.preventDefault(); dropZone.classList.remove('drag');
+}));
+dropZone.addEventListener('drop', ev => {
+  ev.preventDefault();
+  input.files = ev.dataTransfer.files;
+  showFileName(input);
+});
+
+document.getElementById('upload-form').addEventListener('submit', () => {
+  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analysing…';
+  submitBtn.disabled = true;
+});
+</script>
+{% endblock %}

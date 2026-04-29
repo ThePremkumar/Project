@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Detection Logs{% endblock %}
+{% block content %}
+
+<div class="topbar">
+  <div>
+    <div class="page-title">Detection <span>Logs</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Full audit trail of all analysed traffic records</div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <input type="text" id="search" placeholder="Search logs…"
+      style="background:var(--card);border:1px solid var(--border);border-radius:8px;
+             padding:7px 14px;color:var(--text);font-size:12px;outline:none;width:200px;"
+      onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+      oninput="filterTable(this.value)">
+    <select id="filter-type" onchange="filterTable(document.getElementById('search').value)"
+      style="background:var(--card);border:1px solid var(--border);border-radius:8px;
+             padding:7px 14px;color:var(--text);font-size:12px;outline:none;">
+      <option value="">All types</option>
+      <option value="normal">Normal</option>
+      <option value="dos">DoS</option>
+      <option value="probe">Probe</option>
+      <option value="r2l">R2L</option>
+      <option value="u2r">U2R</option>
+    </select>
+  </div>
+</div>
+
+<div class="cyber-card">
+  {% if logs %}
+  <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+    Showing {{ logs|length }} most recent records
+  </div>
+  <table class="cyber-table" id="logs-table">
+    <thead>
+      <tr>
+        <th>ID</th><th>File</th><th>Prediction</th><th>Confidence</th>
+        <th>Severity</th><th>Status</th><th>Timestamp</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in logs %}
+    <tr class="{{ 'row-threat' if row.is_threat else 'row-normal' }}" data-pred="{{ row.prediction }}">
+      <td style="color:var(--muted);font-size:11px;">{{ row.log_id }}</td>
+      <td style="color:var(--text);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ row.filename }}">
+        {{ row.filename or '—' }}
+      </td>
+      <td>
+        <span class="badge-threat b-{{ row.prediction }}">{{ row.prediction.upper() }}</span>
+      </td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="flex:1;background:var(--border);border-radius:3px;height:4px;min-width:60px;">
+            <div style="height:100%;border-radius:3px;width:{{ row.confidence }}%;background:{{ '#FF4D6D' if row.is_threat else '#00E5A0' }};"></div>
+          </div>
+          <span style="font-size:10px;color:var(--muted);">{{ row.confidence }}%</span>
+        </div>
+      </td>
+      <td>
+        <span style="font-size:11px;color:{{ '#FF4D6D' if row.severity in ('High','Critical') else '#FFAA00' if row.severity=='Medium' else '#00E5A0' }};">
+          {{ row.severity }}
+        </span>
+      </td>
+      <td>
+        {% if row.is_threat %}
+        <span style="font-size:10px;color:var(--red);"><i class="fas fa-shield-slash me-1"></i>THREAT</span>
+        {% else %}
+        <span style="font-size:10px;color:var(--green);"><i class="fas fa-shield-check me-1"></i>SAFE</span>
+        {% endif %}
+      </td>
+      <td style="color:var(--muted);font-size:11px;">{{ row.timestamp }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:48px;color:var(--muted);">
+    <i class="fas fa-database" style="font-size:40px;margin-bottom:12px;display:block;opacity:.3;"></i>
+    <div>No logs yet.</div>
+    <a href="{{ url_for('analyse') }}" style="color:var(--accent);font-size:13px;">Upload a CSV file</a> or
+    <a href="{{ url_for('demo') }}" style="color:var(--accent);font-size:13px;">run the demo</a>.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function filterTable(q) {
+  q = q.toLowerCase();
+  const typeFilter = document.getElementById('filter-type').value.toLowerCase();
+  document.querySelectorAll('#logs-table tbody tr').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    const pred = (row.dataset.pred || '').toLowerCase();
+    const matchQ    = !q || text.includes(q);
+    const matchType = !typeFilter || pred === typeFilter;
+    row.style.display = matchQ && matchType ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
