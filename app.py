@@ -3,12 +3,13 @@ Intelligent Cyber Threat Detection System
 Flask Backend — app.py
 Team: Saranya A., Uma M., Thanzim P.
 """
-import os, sys, json, hashlib, io
-from datetime import datetime
+import os, sys, json, hashlib, io, csv
+from datetime import datetime, timedelta
 from functools import wraps
+from collections import defaultdict
 
 from flask import (Flask, render_template, request, redirect,
-                   url_for, session, flash, jsonify, send_file)
+                   url_for, session, flash, jsonify, send_file, Response)
 import sqlite3, pandas as pd, numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "model"))
@@ -53,7 +54,6 @@ def init_db():
             FOREIGN KEY(user_id) REFERENCES users(user_id)
         );
         """)
-    # seed demo user
     try:
         with get_db() as db:
             db.execute("INSERT INTO users (username, password) VALUES (?,?)",
@@ -76,11 +76,9 @@ def login_required(f):
 
 # ── Helper: dataset status info ───────────────────────────────────────────
 def get_model_status():
-    """Returns a dict with current model/dataset info shown in templates."""
     cicids_files = []
     if os.path.isdir(CICIDS_DIR):
         cicids_files = [f for f in os.listdir(CICIDS_DIR) if f.lower().endswith(".csv")]
-
     return {
         "dataset_type":   detector.dataset_type,
         "is_cicids":      detector.dataset_type == "cicids",
@@ -141,18 +139,20 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    uid = session["user_id"]
     with get_db() as db:
-        total   = db.execute("SELECT COUNT(*) FROM logs WHERE user_id=?",
-                             (session["user_id"],)).fetchone()[0]
-        threats = db.execute("SELECT COUNT(*) FROM logs WHERE user_id=? AND is_threat=1",
-                             (session["user_id"],)).fetchone()[0]
+        total   = db.execute("SELECT COUNT(*) FROM logs WHERE user_id=?", (uid,)).fetchone()[0]
+        threats = db.execute("SELECT COUNT(*) FROM logs WHERE user_id=? AND is_threat=1", (uid,)).fetchone()[0]
         recent  = db.execute(
-            "SELECT * FROM logs WHERE user_id=? ORDER BY timestamp DESC LIMIT 10",
-            (session["user_id"],)
+            "SELECT * FROM logs WHERE user_id=? ORDER BY timestamp DESC LIMIT 10", (uid,)
         ).fetchall()
         by_type = db.execute(
-            "SELECT prediction, COUNT(*) as cnt FROM logs WHERE user_id=? GROUP BY prediction",
-            (session["user_id"],)
+            "SELECT prediction, COUNT(*) as cnt FROM logs WHERE user_id=? GROUP BY prediction", (uid,)
+        ).fetchall()
+        # Top threats (non-normal only)
+        top_threats = db.execute(
+            "SELECT prediction, COUNT(*) as cnt FROM logs WHERE user_id=? AND is_threat=1 GROUP BY prediction ORDER BY cnt DESC LIMIT 5",
+            (uid,)
         ).fetchall()
 
     safe       = total - threats
@@ -161,14 +161,14 @@ def dashboard():
     chart_labels = [r["prediction"] for r in by_type]
     chart_values = [r["cnt"]        for r in by_type]
     chart_colors = [
-        "#00E5A0" if l == "normal" else
-        "#FF4D6D" if l in ("dos","r2l","u2r") else "#FFAA00"
+        "#00FFD1" if l == "normal" else
+        "#FF3366" if l in ("dos","r2l","u2r") else "#FF9500"
         for l in chart_labels
     ]
 
     return render_template("dashboard.html",
         total=total, threats=threats, safe=safe, threat_pct=threat_pct,
-        recent=recent,
+        recent=recent, top_threats=top_threats,
         chart_labels=json.dumps(chart_labels),
         chart_values=json.dumps(chart_values),
         chart_colors=json.dumps(chart_colors),
@@ -192,19 +192,14 @@ def analyse():
         filename = f.filename
         try:
             df = pd.read_csv(f)
-            # clean column names — handles CIC-IDS spaces + capitals automatically
             df.columns = (
                 df.columns.str.strip()
                           .str.lower()
                           .str.replace(" ", "_")
             )
-
-            # drop any existing label column so it doesn't confuse the model
             df = df.drop(columns=["label"," label"], errors="ignore")
-
             result_df = detector.predict_df(df)
 
-            # save to DB
             safe_cols = ["protocol_type","service","flag","src_bytes","dst_bytes"]
             with get_db() as db:
                 for _, row in result_df.iterrows():
@@ -255,22 +250,140 @@ def analyse():
 @app.route("/logs")
 @login_required
 def logs():
+    uid = session["user_id"]
     with get_db() as db:
         rows = db.execute(
-            "SELECT * FROM logs WHERE user_id=? ORDER BY timestamp DESC LIMIT 200",
-            (session["user_id"],)
+            "SELECT * FROM logs WHERE user_id=? ORDER BY timestamp DESC LIMIT 200", (uid,)
         ).fetchall()
-    return render_template("logs.html", logs=rows, model_status=get_model_status())
+        total_logs   = db.execute("SELECT COUNT(*) FROM logs WHERE user_id=?", (uid,)).fetchone()[0]
+        threat_count = db.execute("SELECT COUNT(*) FROM logs WHERE user_id=? AND is_threat=1", (uid,)).fetchone()[0]
+        safe_count   = total_logs - threat_count
+    logs_stats = {
+        "total":      total_logs,
+        "threats":    threat_count,
+        "safe":       safe_count,
+        "threat_pct": round(threat_count / total_logs * 100, 1) if total_logs else 0,
+    }
+    return render_template("logs.html", logs=rows, logs_stats=logs_stats, model_status=get_model_status())
+
+# ── Routes: Threats page ───────────────────────────────────────────────────
+@app.route("/threats")
+@login_required
+def threats():
+    """Dedicated threats-only view with pagination."""
+    uid  = session["user_id"]
+    page = max(1, int(request.args.get("page", 1)))
+    per  = 50
+    offset = (page - 1) * per
+    with get_db() as db:
+        total_threats = db.execute(
+            "SELECT COUNT(*) FROM logs WHERE user_id=? AND is_threat=1", (uid,)
+        ).fetchone()[0]
+        rows = db.execute(
+            "SELECT * FROM logs WHERE user_id=? AND is_threat=1 ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+            (uid, per, offset)
+        ).fetchall()
+        by_type = db.execute(
+            "SELECT prediction, COUNT(*) as cnt FROM logs WHERE user_id=? AND is_threat=1 GROUP BY prediction ORDER BY cnt DESC",
+            (uid,)
+        ).fetchall()
+        by_severity = db.execute(
+            "SELECT severity, COUNT(*) as cnt FROM logs WHERE user_id=? AND is_threat=1 GROUP BY severity ORDER BY cnt DESC",
+            (uid,)
+        ).fetchall()
+    pages = max(1, (total_threats + per - 1) // per)
+    return render_template("threats.html",
+        threats=rows, total_threats=total_threats,
+        by_type=by_type, by_severity=by_severity,
+        page=page, pages=pages, per=per,
+        model_status=get_model_status()
+    )
 
 # ── Routes: API ────────────────────────────────────────────────────────────
 @app.route("/api/stats")
 @login_required
 def api_stats():
+    uid = session["user_id"]
     with get_db() as db:
         rows = db.execute(
             "SELECT prediction, severity, timestamp FROM logs "
-            "WHERE user_id=? ORDER BY timestamp DESC LIMIT 100",
-            (session["user_id"],)
+            "WHERE user_id=? ORDER BY timestamp DESC LIMIT 200",
+            (uid,)
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/threat_timeline")
+@login_required
+def api_threat_timeline():
+    """Returns hourly threat/safe counts for the last 24 hours."""
+    uid = session["user_id"]
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT timestamp, is_threat FROM logs WHERE user_id=? "
+            "ORDER BY timestamp DESC LIMIT 5000",
+            (uid,)
+        ).fetchall()
+
+    buckets = defaultdict(lambda: {"threats": 0, "safe": 0})
+    now = datetime.now()
+    for r in rows:
+        try:
+            ts = datetime.strptime(r["timestamp"], "%Y-%m-%d %H:%M:%S")
+            diff = (now - ts).total_seconds() / 3600
+            if diff <= 24:
+                hour_key = ts.strftime("%H:00")
+                if r["is_threat"]:
+                    buckets[hour_key]["threats"] += 1
+                else:
+                    buckets[hour_key]["safe"] += 1
+        except Exception:
+            pass
+
+    # Build 24-slot timeline
+    slots = []
+    for i in range(23, -1, -1):
+        t = (now - timedelta(hours=i))
+        key = t.strftime("%H:00")
+        b = buckets.get(key, {"threats": 0, "safe": 0})
+        slots.append({"hour": key, "threats": b["threats"], "safe": b["safe"]})
+    return jsonify(slots)
+
+@app.route("/api/severity_dist")
+@login_required
+def api_severity_dist():
+    """Severity distribution for current user."""
+    uid = session["user_id"]
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT severity, COUNT(*) as cnt FROM logs WHERE user_id=? GROUP BY severity",
+            (uid,)
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/attack_types")
+@login_required
+def api_attack_types():
+    """Top attack types for current user."""
+    uid = session["user_id"]
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT prediction, COUNT(*) as cnt FROM logs WHERE user_id=? "
+            "AND is_threat=1 GROUP BY prediction ORDER BY cnt DESC",
+            (uid,)
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/recent_critical")
+@login_required
+def api_recent_critical():
+    """Most recent critical/high severity threats."""
+    uid = session["user_id"]
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT prediction, severity, confidence, timestamp, filename FROM logs "
+            "WHERE user_id=? AND is_threat=1 AND severity IN ('Critical','High') "
+            "ORDER BY timestamp DESC LIMIT 5",
+            (uid,)
         ).fetchall()
     return jsonify([dict(r) for r in rows])
 
@@ -299,17 +412,12 @@ def demo():
 @app.route("/sample_csv")
 @login_required
 def sample_csv():
-    """
-    If CIC-IDS data is present, export a real sample from it.
-    Otherwise export synthetic data.
-    """
     import os as _os
     cicids_files = []
     if _os.path.isdir(CICIDS_DIR):
         cicids_files = [f for f in _os.listdir(CICIDS_DIR) if f.lower().endswith(".csv")]
 
     if cicids_files:
-        # grab first 10 rows from the first CIC-IDS file as sample
         path = _os.path.join(CICIDS_DIR, sorted(cicids_files)[0])
         sample = pd.read_csv(path, nrows=10, low_memory=False)
         sample.columns = sample.columns.str.strip().str.lower().str.replace(" ","_")
@@ -331,14 +439,8 @@ def sample_csv():
 @app.route("/retrain", methods=["POST"])
 @login_required
 def retrain():
-    """
-    Delete saved model and retrain.
-    If CIC-IDS files are present → trains on real data.
-    Otherwise → trains on synthetic data.
-    """
     global detector
     try:
-        # delete old model so get_or_train retrains fresh
         if os.path.exists(MODEL_PATH):
             os.remove(MODEL_PATH)
         detector = get_or_train()
@@ -353,6 +455,33 @@ def retrain():
 @login_required
 def api_model_status():
     return jsonify(get_model_status())
+
+# ── Routes: Export logs as CSV ─────────────────────────────────────────────
+@app.route("/export_logs")
+@login_required
+def export_logs():
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT log_id,filename,prediction,confidence,severity,is_threat,timestamp "
+            "FROM logs WHERE user_id=? ORDER BY timestamp DESC",
+            (session["user_id"],)
+        ).fetchall()
+
+    def generate():
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["ID","Filename","Prediction","Confidence","Severity","Is_Threat","Timestamp"])
+        yield buf.getvalue(); buf.seek(0); buf.truncate()
+        for row in rows:
+            writer.writerow(list(row))
+            yield buf.getvalue(); buf.seek(0); buf.truncate()
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return Response(
+        generate(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=ictds_logs_{ts}.csv"}
+    )
 
 # ── Boot ───────────────────────────────────────────────────────────────────
 if __name__ == "__main__":

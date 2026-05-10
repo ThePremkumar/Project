@@ -1,144 +1,360 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
-{% block content %}
 
-<!-- Topbar -->
+{% block content %}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+  /* ── Pulse ring on threat metric ── */
+  @keyframes threatPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(255,77,109,.5); }
+    70%  { box-shadow: 0 0 0 14px rgba(255,77,109,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,77,109,0); }
+  }
+  .metric-card.danger:hover { animation: threatPulse 1.5s infinite; }
+
+  /* ── Counter animation ── */
+  .metric-val { font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Severity timeline ── */
+  .sev-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sev-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+  }
+  .sev-label { width: 60px; color: var(--muted2); font-weight: 600; text-transform: uppercase; font-size: 9px; letter-spacing: .08em; }
+  .sev-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .sev-fill  { height: 100%; border-radius: 3px; transition: width 1.4s cubic-bezier(.4,0,.2,1); }
+  .sev-count { width: 32px; text-align: right; color: var(--muted2); font-size: 10px; font-family: 'JetBrains Mono', monospace; }
+
+  /* ── Recent activity feed styling ── */
+  .activity-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(26,52,96,.45);
+    transition: background .15s;
+    border-radius: 6px;
+  }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-row:hover { background: rgba(0,212,255,.025); padding-left: 6px; }
+  .activity-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .activity-filename {
+    font-size: 11px; color: var(--muted2);
+    max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .activity-time {
+    font-size: 10px; color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: auto; white-space: nowrap;
+  }
+
+  /* ── Model status info card ── */
+  .info-block {
+    background: var(--bg2);
+    border-radius: 10px;
+    padding: 12px 16px;
+    border-left: 3px solid var(--border);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+  }
+  .info-block.good  { border-left-color: var(--green); }
+  .info-block.warn  { border-left-color: var(--amber); }
+  .info-block.info  { border-left-color: var(--accent); }
+
+  /* ── Chart wrapper ── */
+  .chart-wrap { position: relative; }
+
+  /* ── Threat rate ring ── */
+  .ring-wrap {
+    position: relative;
+    width: 110px; height: 110px;
+    margin: 0 auto 12px;
+  }
+  .ring-svg { transform: rotate(-90deg); }
+  .ring-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .ring-val {
+    font-size: 22px;
+    font-weight: 800;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--amber);
+    line-height: 1;
+  }
+  .ring-sub { font-size: 9px; color: var(--muted); letter-spacing: .05em; }
+
+  @media (max-width: 768px) {
+    .dash-grid { grid-template-columns: 1fr 1fr !important; }
+  }
+</style>
+
+<!-- ── Topbar ── -->
 <div class="topbar">
   <div>
     <div class="page-title">Security <span>Dashboard</span></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Intelligent Cyber Threat Detection System</div>
+    <div class="page-subtitle">
+      <i class="fas fa-microchip me-1"></i>
+      Intelligent Cyber Threat Detection &nbsp;·&nbsp;
+      {% if model_status.is_cicids %}
+        <span style="color:var(--green);">CIC-IDS 2017 · ~97% Accuracy</span>
+      {% else %}
+        <span style="color:var(--amber);">Synthetic Dataset · ~79% Accuracy</span>
+      {% endif %}
+    </div>
   </div>
-  <div style="display:flex;align-items:center;gap:10px;">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <div class="live-badge"><div class="live-dot"></div>System Active</div>
-    <a href="{{ url_for('demo') }}" class="btn-cyber" style="font-size:12px;padding:6px 14px;">
-      <i class="fas fa-bolt me-1"></i>Run Demo
+    <a href="{{ url_for('demo') }}" class="btn-cyber" style="font-size:12px;padding:7px 16px;">
+      <i class="fas fa-bolt"></i> Run Demo
     </a>
+    <form method="POST" action="{{ url_for('retrain') }}" style="margin:0;">
+      <button type="submit" class="btn-cyber"
+        style="font-size:12px;padding:7px 16px;border-color:var(--amber);color:var(--amber);"
+        onclick="return confirm('Retrain model? This may take a moment.')">
+        <i class="fas fa-rotate"></i> Retrain
+      </button>
+    </form>
   </div>
 </div>
 
-<!-- Metric cards -->
+<!-- ── Metric Cards ── -->
 <div class="row g-3 mb-4">
-  <div class="col-md-3">
+  <div class="col-6 col-md-3">
     <div class="metric-card accent">
       <div class="metric-label"><i class="fas fa-database me-1"></i>Total Analysed</div>
-      <div class="metric-val accent">{{ total }}</div>
+      <div class="metric-val accent" id="cnt-total">{{ total }}</div>
       <div class="metric-sub">network records scanned</div>
+      <i class="fas fa-database bg-icon"></i>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-6 col-md-3">
     <div class="metric-card danger">
       <div class="metric-label"><i class="fas fa-triangle-exclamation me-1"></i>Threats Detected</div>
-      <div class="metric-val danger">{{ threats }}</div>
-      <div class="metric-sub">{{ threat_pct }}% of total traffic</div>
+      <div class="metric-val danger" id="cnt-threats">{{ threats }}</div>
+      <div class="metric-sub">{{ threat_pct }}% of all traffic</div>
+      <i class="fas fa-skull-crossbones bg-icon"></i>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-6 col-md-3">
     <div class="metric-card success">
       <div class="metric-label"><i class="fas fa-circle-check me-1"></i>Safe Traffic</div>
       <div class="metric-val success">{{ safe }}</div>
       <div class="metric-sub">normal connections</div>
+      <i class="fas fa-shield-check bg-icon"></i>
     </div>
   </div>
-  <div class="col-md-3">
+  <div class="col-6 col-md-3">
     <div class="metric-card warning">
-      <div class="metric-label"><i class="fas fa-gauge me-1"></i>Threat Rate</div>
+      <div class="metric-label"><i class="fas fa-gauge-high me-1"></i>Threat Rate</div>
       <div class="metric-val warning">{{ threat_pct }}%</div>
-      <div class="metric-sub">of all analysed records</div>
       <div class="cyber-progress mt-2">
         <div class="cyber-progress-fill" style="width:{{ threat_pct }}%;background:var(--amber);"></div>
       </div>
+      <i class="fas fa-percent bg-icon"></i>
     </div>
   </div>
 </div>
 
-<!-- Charts row -->
+<!-- ── Charts + Side Panel ── -->
 <div class="row g-3 mb-4">
-  <div class="col-md-8">
+  <!-- Bar chart -->
+  <div class="col-md-7">
     <div class="cyber-card" style="height:300px;">
-      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:16px;">
-        <i class="fas fa-chart-bar me-2"></i>Attack Type Distribution
+      <div class="card-header-row">
+        <div class="card-title"><i class="fas fa-chart-bar"></i> Attack Type Distribution</div>
+        {% if total > 0 %}
+        <div class="chip chip-accent"><i class="fas fa-circle"></i> {{ total }} records</div>
+        {% endif %}
       </div>
       {% if total > 0 %}
       <canvas id="barChart" style="max-height:230px;"></canvas>
       {% else %}
-      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:200px;color:var(--muted);">
-        <i class="fas fa-chart-bar" style="font-size:36px;margin-bottom:10px;opacity:.4;"></i>
-        <div style="font-size:13px;">No data yet — run a demo or upload a CSV file</div>
-        <a href="{{ url_for('demo') }}" class="btn-cyber" style="margin-top:12px;font-size:12px;padding:6px 14px;">
-          <i class="fas fa-bolt me-1"></i>Run Demo Analysis
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:210px;color:var(--muted);">
+        <i class="fas fa-chart-bar" style="font-size:40px;margin-bottom:12px;opacity:.15;"></i>
+        <div style="font-size:13px;margin-bottom:14px;">No data yet</div>
+        <a href="{{ url_for('demo') }}" class="btn-cyber" style="font-size:12px;padding:7px 16px;">
+          <i class="fas fa-bolt"></i> Run Demo Analysis
         </a>
       </div>
       {% endif %}
     </div>
   </div>
-  <div class="col-md-4">
+
+  <!-- Doughnut + Ring -->
+  <div class="col-md-5">
     <div class="cyber-card" style="height:300px;">
-      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:16px;">
-        <i class="fas fa-chart-pie me-2"></i>Traffic Breakdown
+      <div class="card-header-row">
+        <div class="card-title"><i class="fas fa-chart-pie"></i> Traffic Breakdown</div>
+        {% if total > 0 %}
+        <!-- Threat rate ring -->
+        <div class="ring-wrap" style="width:70px;height:70px;">
+          <svg class="ring-svg" width="70" height="70" viewBox="0 0 70 70">
+            <circle cx="35" cy="35" r="28" fill="none" stroke="var(--border)" stroke-width="6"/>
+            <circle id="ring-arc" cx="35" cy="35" r="28" fill="none"
+              stroke="{{ '#FF4D6D' if threat_pct > 50 else '#FFB300' if threat_pct > 15 else '#00E5A0' }}"
+              stroke-width="6"
+              stroke-dasharray="{{ (threat_pct / 100 * 175.93)|round(1) }} 175.93"
+              stroke-linecap="round"/>
+          </svg>
+          <div class="ring-text">
+            <div class="ring-val" style="font-size:14px;color:{{ '#FF4D6D' if threat_pct > 50 else '#FFB300' if threat_pct > 15 else '#00E5A0' }};">{{ threat_pct }}%</div>
+            <div class="ring-sub">threat</div>
+          </div>
+        </div>
+        {% endif %}
       </div>
       {% if total > 0 %}
-      <canvas id="pieChart" style="max-height:230px;"></canvas>
+      <canvas id="pieChart" style="max-height:220px;"></canvas>
       {% else %}
-      <div style="display:flex;align-items:center;justify-content:center;height:200px;color:var(--muted);font-size:13px;">
-        No data yet
-      </div>
+      <div style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--muted);font-size:13px;">No data yet</div>
       {% endif %}
     </div>
   </div>
 </div>
 
-<!-- Recent detections -->
-<div class="cyber-card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--accent);">
-      <i class="fas fa-list-check me-2"></i>Recent Detections
+<!-- ── Bottom row: Recent detections + Model info ── -->
+<div class="row g-3">
+  <!-- Recent detections table -->
+  <div class="col-md-8">
+    <div class="cyber-card">
+      <div class="card-header-row">
+        <div class="card-title"><i class="fas fa-list-check"></i> Recent Detections</div>
+        <a href="{{ url_for('logs') }}" style="font-size:11px;color:var(--muted2);text-decoration:none;">
+          View all <i class="fas fa-arrow-right ms-1"></i>
+        </a>
+      </div>
+
+      {% if recent %}
+      <div style="overflow-x:auto;">
+        <table class="cyber-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Source File</th><th>Prediction</th><th>Severity</th>
+              <th>Confidence</th><th>Status</th><th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for row in recent %}
+            <tr class="{{ 'row-threat' if row.is_threat else 'row-normal' }}">
+              <td style="color:var(--muted);font-size:10px;font-family:'JetBrains Mono',monospace;">#{{ row.log_id }}</td>
+              <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ row.filename }}">
+                <i class="fas fa-file-csv me-1" style="color:var(--muted);font-size:10px;"></i>{{ row.filename or '—' }}
+              </td>
+              <td><span class="badge-threat b-{{ row.prediction }}">{{ row.prediction.upper() }}</span></td>
+              <td>
+                <span style="font-size:10px;font-weight:700;color:
+                  {{ '#FF4D6D' if row.severity in ('High','Critical') else '#FFB300' if row.severity=='Medium' else '#00E5A0' }};">
+                  {% if row.severity == 'Critical' %}<i class="fas fa-circle-exclamation me-1"></i>
+                  {% elif row.severity == 'High' %}<i class="fas fa-arrow-up me-1"></i>
+                  {% elif row.severity == 'Medium' %}<i class="fas fa-minus me-1"></i>
+                  {% else %}<i class="fas fa-arrow-down me-1"></i>{% endif %}
+                  {{ row.severity }}
+                </span>
+              </td>
+              <td>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <div style="flex:1;background:var(--border);border-radius:3px;height:4px;min-width:50px;">
+                    <div style="height:100%;border-radius:3px;width:{{ row.confidence }}%;
+                      background:{{ 'var(--red)' if row.is_threat else 'var(--green)' }};"></div>
+                  </div>
+                  <span style="font-size:10px;color:var(--muted2);font-family:'JetBrains Mono',monospace;">{{ row.confidence }}%</span>
+                </div>
+              </td>
+              <td>
+                {% if row.is_threat %}
+                <span class="chip chip-red" style="font-size:10px;"><i class="fas fa-triangle-exclamation"></i> THREAT</span>
+                {% else %}
+                <span class="chip chip-green" style="font-size:10px;"><i class="fas fa-check"></i> SAFE</span>
+                {% endif %}
+              </td>
+              <td style="color:var(--muted);font-size:10px;white-space:nowrap;font-family:'JetBrains Mono',monospace;">{{ row.timestamp }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:40px 24px;color:var(--muted);">
+        <i class="fas fa-inbox" style="font-size:40px;margin-bottom:14px;display:block;opacity:.15;"></i>
+        <div style="font-size:14px;margin-bottom:4px;color:var(--muted2);">No detections yet</div>
+        <div style="font-size:12px;">
+          <a href="{{ url_for('analyse') }}" style="color:var(--accent);">Upload a CSV file</a>
+          or <a href="{{ url_for('demo') }}" style="color:var(--accent);">run a demo analysis</a>
+        </div>
+      </div>
+      {% endif %}
     </div>
-    <a href="{{ url_for('logs') }}" style="font-size:11px;color:var(--muted);text-decoration:none;">
-      View all <i class="fas fa-arrow-right ms-1"></i>
-    </a>
   </div>
-  {% if recent %}
-  <table class="cyber-table">
-    <thead>
-      <tr>
-        <th>#</th><th>File</th><th>Prediction</th><th>Severity</th><th>Confidence</th><th>Timestamp</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for row in recent %}
-      <tr class="{{ 'row-threat' if row.is_threat else 'row-normal' }}">
-        <td style="color:var(--muted);">{{ row.log_id }}</td>
-        <td style="color:var(--text);">{{ row.filename or '—' }}</td>
-        <td>
-          <span class="badge-threat b-{{ row.prediction }}">
-            {{ row.prediction.upper() }}
-          </span>
-        </td>
-        <td>
-          <span style="font-size:11px;color:{{ '#FF4D6D' if row.severity in ('High','Critical') else '#FFAA00' if row.severity=='Medium' else '#00E5A0' }};">
-            {{ row.severity }}
-          </span>
-        </td>
-        <td>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <div style="flex:1;background:var(--border);border-radius:3px;height:4px;min-width:60px;">
-              <div style="height:100%;border-radius:3px;width:{{ row.confidence }}%;background:{{ '#FF4D6D' if row.is_threat else '#00E5A0' }};"></div>
-            </div>
-            <span style="font-size:10px;color:var(--muted);">{{ row.confidence }}%</span>
-          </div>
-        </td>
-        <td style="color:var(--muted);font-size:11px;">{{ row.timestamp }}</td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <div style="text-align:center;padding:32px;color:var(--muted);">
-    <i class="fas fa-inbox" style="font-size:32px;margin-bottom:10px;display:block;opacity:.4;"></i>
-    No detections yet. <a href="{{ url_for('analyse') }}" style="color:var(--accent);">Upload a CSV file</a> or
-    <a href="{{ url_for('demo') }}" style="color:var(--accent);">run a demo</a>.
+
+  <!-- Model info + quick actions -->
+  <div class="col-md-4">
+    <div class="cyber-card" style="height:100%;">
+      <div class="card-title" style="margin-bottom:16px;"><i class="fas fa-microchip"></i> Model Status</div>
+
+      <div class="info-block {{ 'good' if model_status.model_exists else 'warn' }}">
+        <span style="color:var(--muted2);">Status</span>
+        {% if model_status.model_exists %}
+        <span class="chip chip-green"><i class="fas fa-check"></i> Loaded</span>
+        {% else %}
+        <span class="chip chip-amber"><i class="fas fa-spinner fa-spin"></i> Training</span>
+        {% endif %}
+      </div>
+
+      <div class="info-block {{ 'good' if model_status.is_cicids else 'warn' }}">
+        <span style="color:var(--muted2);">Dataset</span>
+        <span class="chip {{ 'chip-green' if model_status.is_cicids else 'chip-amber' }}">
+          {{ 'CIC-IDS 2017' if model_status.is_cicids else 'Synthetic' }}
+        </span>
+      </div>
+
+      <div class="info-block info">
+        <span style="color:var(--muted2);">Accuracy</span>
+        <span style="color:var(--accent);font-weight:700;font-family:'JetBrains Mono',monospace;">{{ model_status.accuracy_label }}</span>
+      </div>
+
+      {% if total > 0 %}
+      <div class="cyber-divider"></div>
+      <div style="font-size:11px;color:var(--muted2);font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">
+        Severity Breakdown
+      </div>
+      <div class="sev-timeline" id="sev-breakdown">
+        <div style="color:var(--muted);font-size:11px;">Loading…</div>
+      </div>
+      {% endif %}
+
+      <div class="cyber-divider"></div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <a href="{{ url_for('analyse') }}" class="btn-cyber-solid" style="justify-content:center;">
+          <i class="fas fa-magnifying-glass-chart"></i> Analyse Traffic
+        </a>
+        <a href="{{ url_for('logs') }}" class="btn-cyber" style="justify-content:center;">
+          <i class="fas fa-list-check"></i> View All Logs
+        </a>
+        <a href="{{ url_for('export_logs') }}" class="btn-cyber" style="justify-content:center;border-color:var(--green);color:var(--green);">
+          <i class="fas fa-file-arrow-down"></i> Export CSV
+        </a>
+      </div>
+    </div>
   </div>
-  {% endif %}
 </div>
 
 {% endblock %}
@@ -149,35 +365,110 @@
 const labels = {{ chart_labels|safe }};
 const values = {{ chart_values|safe }};
 const colors = {{ chart_colors|safe }};
-const gridColor = 'rgba(30,58,110,0.6)';
-const tickColor = '#94A3B8';
+const gridColor = 'rgba(26,52,96,0.7)';
+const tickColor = '#64748B';
 
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
 Chart.defaults.color = tickColor;
 
 new Chart(document.getElementById('barChart'), {
   type: 'bar',
-  data: { labels, datasets: [{ data: values, backgroundColor: colors, borderRadius: 6, borderSkipped: false }] },
+  data: {
+    labels,
+    datasets: [{
+      data: values,
+      backgroundColor: colors.map(c => c + '28'),
+      borderColor: colors,
+      borderWidth: 2,
+      borderRadius: 8,
+      borderSkipped: false,
+    }]
+  },
   options: {
     responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#162245', titleColor: '#00C8FF', bodyColor: '#E2E8F0' } },
+    animation: { duration: 900, easing: 'easeOutQuart' },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0F1B35', titleColor: '#00D4FF',
+        bodyColor: '#E2E8F0', borderColor: '#1A3460',
+        borderWidth: 1, padding: 12, cornerRadius: 9,
+        callbacks: {
+          label: ctx => ` ${ctx.parsed.y.toLocaleString()} records`
+        }
+      }
+    },
     scales: {
-      x: { grid: { color: gridColor }, ticks: { color: tickColor } },
-      y: { grid: { color: gridColor }, ticks: { color: tickColor }, beginAtZero: true }
+      x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 11 } } },
+      y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 11 } }, beginAtZero: true }
     }
   }
 });
 
 new Chart(document.getElementById('pieChart'), {
   type: 'doughnut',
-  data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#162245', borderWidth: 2 }] },
+  data: {
+    labels,
+    datasets: [{
+      data: values,
+      backgroundColor: colors.map(c => c + '22'),
+      borderColor: colors,
+      borderWidth: 2,
+      hoverBackgroundColor: colors.map(c => c + '44'),
+    }]
+  },
   options: {
     responsive: true, maintainAspectRatio: false,
+    animation: { animateRotate: true, duration: 1000 },
     plugins: {
-      legend: { position: 'bottom', labels: { color: tickColor, boxWidth: 12, padding: 10, font: { size: 11 } } },
-      tooltip: { backgroundColor: '#162245', titleColor: '#00C8FF', bodyColor: '#E2E8F0' }
+      legend: { position: 'bottom', labels: { color: tickColor, boxWidth: 10, padding: 10, font: { size: 10 } } },
+      tooltip: {
+        backgroundColor: '#0F1B35', titleColor: '#00D4FF',
+        bodyColor: '#E2E8F0', borderColor: '#1A3460',
+        borderWidth: 1, padding: 10, cornerRadius: 8,
+        callbacks: {
+          label: ctx => ` ${ctx.parsed.toLocaleString()} records`
+        }
+      }
     },
-    cutout: '65%'
+    cutout: '66%',
   }
+});
+
+// ── Animated counter ──
+function animateCount(el, target, duration = 1200) {
+  const start = performance.now();
+  const update = now => {
+    const t = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(ease * target).toLocaleString();
+    if (t < 1) requestAnimationFrame(update);
+  };
+  requestAnimationFrame(update);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  const totalEl   = document.getElementById('cnt-total');
+  const threatEl  = document.getElementById('cnt-threats');
+  if (totalEl)  animateCount(totalEl,  {{ total }});
+  if (threatEl) animateCount(threatEl, {{ threats }});
+});
+
+// ── Severity breakdown via API ──
+fetch('/api/stats').then(r => r.json()).then(rows => {
+  const sev = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+  rows.forEach(r => { if (sev[r.severity] !== undefined) sev[r.severity]++; });
+  const total = Object.values(sev).reduce((a,b) => a+b, 0);
+  const colors = { Critical: 'var(--red)', High: '#FF6450', Medium: 'var(--amber)', Low: 'var(--green)' };
+  const el = document.getElementById('sev-breakdown');
+  if (!el) return;
+  el.innerHTML = Object.entries(sev).map(([k, v]) => `
+    <div class="sev-row">
+      <div class="sev-label">${k}</div>
+      <div class="sev-track">
+        <div class="sev-fill" style="width:${total?v/total*100:0}%;background:${colors[k]};"></div>
+      </div>
+      <div class="sev-count">${v}</div>
+    </div>`).join('');
 });
 </script>
 {% endif %}

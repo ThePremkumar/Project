@@ -5,150 +5,189 @@
 <div class="topbar">
   <div>
     <div class="page-title">Analyse <span>Traffic</span></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:2px;">Upload a CSV network log file for ML-based threat classification</div>
+    <div class="page-subtitle">
+      <i class="fas fa-microchip me-1"></i>
+      Upload a network log CSV for ML-based threat classification &nbsp;·&nbsp;
+      Model: <span style="color:var(--accent);">Random Forest + Gradient Boosting Ensemble</span>
+    </div>
   </div>
-  <a href="{{ url_for('sample_csv') }}" class="btn-cyber" style="font-size:12px;padding:6px 14px;">
-    <i class="fas fa-download me-1"></i>Download Sample CSV
+  <a href="{{ url_for('sample_csv') }}" class="btn-cyber" style="font-size:12px;padding:7px 16px;">
+    <i class="fas fa-download"></i> Download Sample CSV
   </a>
 </div>
 
-<!-- Upload card -->
+<!-- ── Upload + Info row ── -->
 <div class="row g-3 mb-4">
   <div class="col-md-7">
     <div class="cyber-card">
-      <h6 style="color:var(--accent);margin-bottom:20px;font-size:13px;">
-        <i class="fas fa-upload me-2"></i>Upload Network Log File
-      </h6>
+      <div class="card-title" style="margin-bottom:20px;">
+        <i class="fas fa-cloud-upload-alt"></i> Upload Network Log File
+      </div>
       <form method="POST" enctype="multipart/form-data" id="upload-form">
         <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
-          <i class="fas fa-file-csv"></i>
-          <div style="font-size:15px;color:var(--text);font-weight:600;margin-bottom:6px;">
+          <i class="fas fa-file-csv upload-icon"></i>
+          <div style="font-size:15px;color:var(--text);font-weight:700;margin-bottom:6px;">
             Drop CSV file here or click to browse
           </div>
-          <div style="font-size:12px;color:var(--muted);">Accepted format: .csv with network traffic features</div>
-          <div id="file-name" style="margin-top:10px;font-size:12px;color:var(--accent);display:none;"></div>
+          <div style="font-size:12px;color:var(--muted);">Accepted: .csv with network traffic features</div>
+          <div id="file-name" style="margin-top:12px;font-size:13px;color:var(--accent);display:none;font-weight:600;">
+            <i class="fas fa-file-check me-1"></i><span id="file-name-text"></span>
+          </div>
         </div>
         <input type="file" name="csv_file" id="csv-input" accept=".csv" style="display:none;" onchange="showFileName(this)">
-        <button type="submit" class="btn-cyber-solid w-100 mt-3" id="submit-btn" style="display:none;">
-          <i class="fas fa-magnifying-glass-chart me-2"></i>Analyse Traffic
+        <button type="submit" class="btn-cyber-solid w-100 mt-3" id="submit-btn" style="display:none;justify-content:center;padding:12px;font-size:14px;">
+          <i class="fas fa-magnifying-glass-chart"></i> Analyse Traffic
         </button>
       </form>
+
+      <!-- Progress bar (shown while submitting) -->
+      <div id="analysis-progress" style="display:none;margin-top:16px;">
+        <div style="font-size:12px;color:var(--muted2);margin-bottom:8px;">
+          <i class="fas fa-spinner fa-spin me-2" style="color:var(--accent);"></i>Analysing records…
+        </div>
+        <div class="cyber-progress" style="height:6px;">
+          <div class="cyber-progress-fill" id="progress-anim" style="width:0%;background:var(--accent);transition:width 2s ease;"></div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div class="col-md-5">
     <div class="cyber-card" style="height:100%;">
-      <h6 style="color:var(--accent);margin-bottom:16px;font-size:13px;">
-        <i class="fas fa-circle-info me-2"></i>Expected CSV Columns
-      </h6>
-      <div style="font-size:11px;color:var(--muted);line-height:1.9;">
-        <code style="color:var(--accent);">protocol_type</code>, 
-        <code style="color:var(--accent);">service</code>, 
-        <code style="color:var(--accent);">flag</code>, 
-        <code style="color:var(--accent);">src_bytes</code>, 
-        <code style="color:var(--accent);">dst_bytes</code>, 
-        <code style="color:var(--accent);">duration</code>, 
-        <code style="color:var(--accent);">count</code>, 
-        <code style="color:var(--accent);">serror_rate</code>, 
-        <code style="color:var(--accent);">rerror_rate</code>, 
-        <code style="color:var(--accent);">same_srv_rate</code>
-        <span style="color:var(--muted);"> + 32 more network features</span>
+      <div class="card-title" style="margin-bottom:16px;">
+        <i class="fas fa-circle-info"></i> Input Requirements
       </div>
-      <div style="margin-top:16px;padding:10px 14px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--accent);">
-        <div style="font-size:11px;color:var(--muted);">Based on NSL-KDD / CIC-IDS 2017 dataset schema.</div>
-        <a href="{{ url_for('sample_csv') }}" style="font-size:11px;color:var(--accent);text-decoration:none;">
+
+      <div style="font-size:11px;color:var(--muted2);line-height:2;margin-bottom:14px;">
+        {% set cols = ['protocol_type','service','flag','src_bytes','dst_bytes','duration','count','serror_rate','rerror_rate','same_srv_rate'] %}
+        {% for c in cols %}
+        <code style="color:var(--accent);background:rgba(0,212,255,.07);padding:1px 6px;border-radius:4px;margin:2px;display:inline-block;">{{ c }}</code>
+        {% endfor %}
+        <span style="color:var(--muted);"> + 32 more features</span>
+      </div>
+
+      <div style="background:var(--bg2);border-radius:10px;border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:600;color:var(--muted2);margin-bottom:4px;">Schema</div>
+        <div style="font-size:11px;color:var(--muted);">NSL-KDD / CIC-IDS 2017 compatible</div>
+        <a href="{{ url_for('sample_csv') }}" style="font-size:11px;color:var(--accent);text-decoration:none;display:block;margin-top:6px;">
           <i class="fas fa-download me-1"></i>Download sample CSV to get started
         </a>
       </div>
-      <div style="margin-top:12px;padding:10px 14px;background:var(--bg2);border-radius:8px;border-left:3px solid var(--green);">
+
+      <div style="background:var(--bg2);border-radius:10px;border-left:3px solid var(--green);padding:12px 16px;">
         <div style="font-size:11px;color:var(--muted);">
           <i class="fas fa-bolt me-1" style="color:var(--green);"></i>
-          Want instant results? <a href="{{ url_for('demo') }}" style="color:var(--green);">Run the demo</a> — analyses 20 synthetic packets immediately.
+          Want instant results? <a href="{{ url_for('demo') }}" style="color:var(--green);font-weight:600;">Run the demo</a>
+          — analyses 20 synthetic packets immediately.
         </div>
       </div>
+
+      {% if model_status %}
+      <div class="cyber-divider"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;">
+        <span style="color:var(--muted);">Model status</span>
+        {% if model_status.model_exists %}
+        <span class="chip chip-green"><i class="fas fa-check"></i> Loaded</span>
+        {% else %}
+        <span class="chip chip-amber"><i class="fas fa-spinner fa-spin"></i> Training</span>
+        {% endif %}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-top:8px;">
+        <span style="color:var(--muted);">Dataset</span>
+        <span class="chip {{ 'chip-green' if model_status.is_cicids else 'chip-amber' }}">
+          {{ 'CIC-IDS 2017' if model_status.is_cicids else 'Synthetic' }}
+        </span>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-top:8px;">
+        <span style="color:var(--muted);">Accuracy</span>
+        <span style="color:var(--accent);font-weight:700;">{{ model_status.accuracy_label }}</span>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
 
 {% if results %}
-<!-- Summary cards -->
-<div class="row g-3 mb-3">
-  <div class="col">
+<!-- ── Summary metric cards ── -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
     <div class="metric-card accent">
       <div class="metric-label">Total Records</div>
       <div class="metric-val accent">{{ summary.total }}</div>
+      <div class="metric-sub">in {{ filename }}</div>
     </div>
   </div>
-  <div class="col">
+  <div class="col-6 col-md-3">
     <div class="metric-card danger">
       <div class="metric-label">Threats Found</div>
       <div class="metric-val danger">{{ summary.threats }}</div>
+      <div class="metric-sub">{{ summary.threat_pct }}% of records</div>
     </div>
   </div>
-  <div class="col">
+  <div class="col-6 col-md-3">
     <div class="metric-card success">
       <div class="metric-label">Safe Traffic</div>
       <div class="metric-val success">{{ summary.safe }}</div>
+      <div class="metric-sub">normal connections</div>
     </div>
   </div>
-  <div class="col">
+  <div class="col-6 col-md-3">
     <div class="metric-card warning">
       <div class="metric-label">Threat Rate</div>
       <div class="metric-val warning">{{ summary.threat_pct }}%</div>
+      <div class="cyber-progress mt-2">
+        <div class="cyber-progress-fill" style="width:{{ summary.threat_pct }}%;background:var(--amber);"></div>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- Results table -->
+<!-- ── Results table ── -->
 <div class="cyber-card">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-    <div style="font-size:13px;font-weight:600;color:var(--accent);">
-      <i class="fas fa-table me-2"></i>Classification Results — {{ filename }}
+  <div class="card-header-row">
+    <div class="card-title">
+      <i class="fas fa-table"></i> Classification Results — {{ filename }}
     </div>
-    <div style="display:flex;gap:8px;font-size:11px;">
-      <span style="background:rgba(0,229,160,.1);color:var(--green);border:1px solid rgba(0,229,160,.2);border-radius:4px;padding:2px 8px;">
-        <i class="fas fa-circle-check me-1"></i>Normal: {{ summary.by_type.get('normal', 0) }}
-      </span>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <span class="chip chip-green"><i class="fas fa-check"></i> Normal: {{ summary.by_type.get('normal', 0) }}</span>
       {% for k,v in summary.by_type.items() %}
         {% if k != 'normal' %}
-        <span style="background:rgba(255,77,109,.1);color:var(--red);border:1px solid rgba(255,77,109,.2);border-radius:4px;padding:2px 8px;">
-          <i class="fas fa-triangle-exclamation me-1"></i>{{ k.upper() }}: {{ v }}
-        </span>
+        <span class="chip chip-red"><i class="fas fa-triangle-exclamation"></i> {{ k.upper() }}: {{ v }}</span>
         {% endif %}
       {% endfor %}
     </div>
   </div>
 
-  <div style="max-height:420px;overflow-y:auto;">
+  <div style="max-height:450px;overflow-y:auto;">
     <table class="cyber-table">
-      <thead style="position:sticky;top:0;background:var(--card);">
+      <thead style="position:sticky;top:0;background:var(--card);z-index:2;">
         <tr><th>#</th><th>Prediction</th><th>Confidence</th><th>Severity</th><th>Status</th></tr>
       </thead>
       <tbody>
       {% for i, row in enumerate(results) %}
         <tr class="{{ 'row-threat' if row.is_threat else 'row-normal' }}">
-          <td style="color:var(--muted);">{{ i + 1 }}</td>
+          <td style="color:var(--muted);font-size:11px;">{{ i + 1 }}</td>
+          <td><span class="badge-threat b-{{ row.prediction }}">{{ row.prediction.upper() }}</span></td>
           <td>
-            <span class="badge-threat b-{{ row.prediction }}">{{ row.prediction.upper() }}</span>
-          </td>
-          <td>
-            <div style="display:flex;align-items:center;gap:6px;">
-              <div style="flex:1;background:var(--border);border-radius:3px;height:4px;min-width:70px;">
-                <div style="height:100%;border-radius:3px;width:{{ row.confidence }}%;background:{{ '#FF4D6D' if row.is_threat else '#00E5A0' }};"></div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;background:var(--border);border-radius:3px;height:4px;min-width:80px;">
+                <div style="height:100%;border-radius:3px;width:{{ row.confidence }}%;
+                  background:{{ 'var(--red)' if row.is_threat else 'var(--green)' }};"></div>
               </div>
-              <span style="font-size:11px;color:var(--muted);min-width:36px;">{{ row.confidence }}%</span>
+              <span style="font-size:11px;color:var(--muted2);min-width:36px;">{{ row.confidence }}%</span>
             </div>
           </td>
           <td>
-            <span style="font-size:11px;color:{{ '#FF4D6D' if row.severity in ('High','Critical') else '#FFAA00' if row.severity=='Medium' else '#00E5A0' }};">
+            <span style="font-size:11px;font-weight:600;color:
+              {{ '#FF4D6D' if row.severity in ('High','Critical') else '#FFB300' if row.severity=='Medium' else '#00E5A0' }};">
               {{ row.severity }}
             </span>
           </td>
           <td>
             {% if row.is_threat %}
-            <span style="font-size:10px;color:var(--red);"><i class="fas fa-triangle-exclamation me-1"></i>THREAT</span>
+            <span class="chip chip-red"><i class="fas fa-triangle-exclamation"></i> THREAT</span>
             {% else %}
-            <span style="font-size:10px;color:var(--green);"><i class="fas fa-circle-check me-1"></i>SAFE</span>
+            <span class="chip chip-green"><i class="fas fa-check"></i> SAFE</span>
             {% endif %}
           </td>
         </tr>
@@ -160,18 +199,18 @@
 {% endif %}
 
 {% endblock %}
-
 {% block scripts %}
 <script>
-const dropZone = document.getElementById('drop-zone');
-const input    = document.getElementById('csv-input');
-const submitBtn= document.getElementById('submit-btn');
+const dropZone  = document.getElementById('drop-zone');
+const input     = document.getElementById('csv-input');
+const submitBtn = document.getElementById('submit-btn');
 
 function showFileName(inp) {
   if (inp.files.length) {
-    document.getElementById('file-name').style.display = 'block';
-    document.getElementById('file-name').textContent   = inp.files[0].name;
-    submitBtn.style.display = 'block';
+    const nameEl = document.getElementById('file-name');
+    document.getElementById('file-name-text').textContent = inp.files[0].name;
+    nameEl.style.display = 'block';
+    submitBtn.style.display = 'flex';
     dropZone.style.borderColor = 'var(--accent)';
   }
 }
@@ -189,8 +228,9 @@ dropZone.addEventListener('drop', ev => {
 });
 
 document.getElementById('upload-form').addEventListener('submit', () => {
-  submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Analysing…';
-  submitBtn.disabled = true;
+  submitBtn.style.display = 'none';
+  document.getElementById('analysis-progress').style.display = 'block';
+  setTimeout(() => { document.getElementById('progress-anim').style.width = '85%'; }, 100);
 });
 </script>
 {% endblock %}
