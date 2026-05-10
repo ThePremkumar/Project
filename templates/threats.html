@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Threat Report{% endblock %}
+{% block page_name %}Threat Intelligence{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Threat Intelligence</h1>
+    <p class="page-header-subtitle">Comprehensive analysis of malicious traffic detected by the ICTDS engine.</p>
+  </div>
+  <div class="page-header-actions">
+    <a href="{{ url_for('export_logs') }}" class="btn btn-danger">
+      <i class="fas fa-file-arrow-down"></i> Export Threat Intel
+    </a>
+  </div>
+</div>
+
+<!-- Threat Summary Banner -->
+<div class="card card-danger mb-4">
+  <div class="row align-items-center">
+    <div class="col-12 col-md-3 text-center border-end">
+      <span class="card-label">Total Threats</span>
+      <div class="metric-number" style="color: var(--danger); font-size: 48px;">{{ total_threats }}</div>
+    </div>
+    <div class="col-12 col-md-9 px-4 py-2">
+      <div class="row">
+        <div class="col-4 text-center">
+          <span class="card-label">Critical</span>
+          <div class="h3 font-monospace" style="color: var(--danger);">{{ critical_count }}</div>
+        </div>
+        <div class="col-4 text-center">
+          <span class="card-label">Attack Types</span>
+          <div class="h3 font-monospace">{{ by_type|length }}</div>
+        </div>
+        <div class="col-4 text-center">
+          <span class="card-label">Data Pages</span>
+          <div class="h3 font-monospace">{{ pages }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Attack Type Distribution -->
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label">Distribution</span>
+        <h3 class="card-title">Attack Type Frequency</h3>
+      </div>
+      <div class="py-2">
+        {% if by_type %}
+        {% set max_cnt = by_type[0].cnt %}
+        {% for row in by_type %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between mb-1 align-items-center">
+            <span class="badge badge-danger">{{ row.prediction.upper() }}</span>
+            <span class="code-text">{{ row.cnt }} events ({{ ((row.cnt/total_threats*100)|round(1)) if total_threats else 0 }}%)</span>
+          </div>
+          <div class="progress" style="height: 8px; background: var(--bg-elevated);">
+            <div class="progress-bar" style="width: {{ (row.cnt/max_cnt*100)|round }}%; background: var(--danger);"></div>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-5 text-muted">No threat data found</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Severity Breakdown -->
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label">Severity Breakdown</span>
+        <h3 class="card-title">Risk Level Distribution</h3>
+      </div>
+      <div class="py-2">
+        {% if by_severity %}
+        {% set max_sev = by_severity[0].cnt %}
+        {% for row in by_severity %}
+        <div class="mb-3">
+          <div class="d-flex justify-content-between mb-1 align-items-center">
+            <span class="badge badge-{{ row.severity|lower }}">{{ row.severity }}</span>
+            <span class="code-text">{{ row.cnt }} detections</span>
+          </div>
+          <div class="progress" style="height: 8px; background: var(--bg-elevated);">
+            <div class="progress-bar" style="width: {{ (row.cnt/max_sev*100)|round }}%; background: {% if row.severity=='Critical' %}var(--danger){% elif row.severity=='High' %}var(--warn){% elif row.severity=='Medium' %}var(--info){% else %}var(--safe){% endif %};"></div>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-center py-5 text-muted">No severity data found</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Threats Detail Table -->
+<div class="card">
+  <div class="card-header d-flex flex-row justify-content-between align-items-center">
+    <div>
+      <span class="card-label">Threat Intel</span>
+      <h3 class="card-title">Historical Threat Records — Page {{ page }}/{{ pages }}</h3>
+    </div>
+    <span class="badge badge-danger">{{ total_threats }} total detections</span>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Source File</th>
+          <th>Attack Type</th>
+          <th>Confidence</th>
+          <th>Severity</th>
+          <th>Timestamp</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in threats %}
+        <tr>
+          <td class="code-text">#{{ row.log_id }}</td>
+          <td class="text-truncate" style="max-width: 150px;" title="{{ row.filename }}">
+            <i class="fas fa-file-csv me-1 opacity-50"></i>{{ row.filename or '—' }}
+          </td>
+          <td>
+            <span class="badge badge-danger">{{ row.prediction.upper() }}</span>
+          </td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress" style="width: 60px; height: 4px; background: var(--bg-elevated);">
+                <div class="progress-bar" style="width: {{ row.confidence }}%; background: var(--danger);"></div>
+              </div>
+              <span class="code-text">{{ row.confidence }}%</span>
+            </div>
+          </td>
+          <td>
+            <span class="badge badge-{{ row.severity|lower }}">{{ row.severity }}</span>
+          </td>
+          <td class="code-text">{{ row.timestamp }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if not threats %}
+  <div class="text-center py-5">
+    <i class="fas fa-shield-check fa-4x mb-3 text-success opacity-25"></i>
+    <h3 class="text-success">System is Secure</h3>
+    <p class="text-muted">No malicious traffic has been detected in the audit trail.</p>
+  </div>
+  {% endif %}
+
+  <!-- Pagination -->
+  {% if pages > 1 %}
+  <div class="d-flex justify-content-center mt-4">
+    <nav>
+      <ul class="pagination pagination-sm">
+        {% if page > 1 %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('threats', page=page-1) }}"><i class="fas fa-chevron-left"></i></a>
+        </li>
+        {% endif %}
+        
+        {% for p in range(1, pages+1) %}
+          {% if p <= 3 or p > pages-2 or (p >= page-1 and p <= page+1) %}
+          <li class="page-item {{ 'active' if p==page else '' }}">
+            <a class="page-link" href="{{ url_for('threats', page=p) }}">{{ p }}</a>
+          </li>
+          {% elif p == 4 or p == pages-2 %}
+          <li class="page-item disabled"><span class="page-link">...</span></li>
+          {% endif %}
+        {% endfor %}
+
+        {% if page < pages %}
+        <li class="page-item">
+          <a class="page-link" href="{{ url_for('threats', page=page+1) }}"><i class="fas fa-chevron-right"></i></a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+  .pagination .page-link {
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    margin: 0 2px;
+    border-radius: 4px;
+  }
+  .pagination .page-item.active .page-link {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: var(--text-inverse);
+  }
+  .pagination .page-link:hover {
+    background-color: var(--bg-hover);
+    color: var(--accent);
+  }
+</style>
+
+{% endblock %}

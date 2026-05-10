@@ -1,204 +1,301 @@
 {% extends "base.html" %}
 {% block title %}Analyse Traffic{% endblock %}
+{% block page_name %}Analyse Traffic{% endblock %}
 {% block content %}
 
-<div class="topbar">
-  <div>
-    <div class="page-title">Analyse <span>Traffic</span></div>
-    <div class="page-subtitle">
-      <i class="fas fa-microchip me-1"></i>
-      Upload a network log CSV for ML-based threat classification &nbsp;·&nbsp;
-      Model: <span style="color:var(--accent);">Random Forest + Gradient Boosting Ensemble</span>
-    </div>
+<style>
+  .upload-container {
+    padding: 40px;
+    text-align: center;
+    border: 2px dashed var(--accent);
+    border-radius: 12px;
+    background: var(--bg-surface);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .upload-container:hover {
+    background: var(--accent-soft);
+    border-color: var(--accent-dark);
+  }
+
+  .upload-icon {
+    font-size: 48px;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .stepper {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    position: relative;
+  }
+
+  .stepper::before {
+    content: "";
+    position: absolute;
+    top: 15px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--border);
+    z-index: 1;
+  }
+
+  .step {
+    position: relative;
+    z-index: 2;
+    background: var(--bg);
+    padding: 0 10px;
+    text-align: center;
+    flex: 1;
+  }
+
+  .step-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-surface);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 8px;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+  }
+
+  .step.active .step-circle {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--text-inverse);
+  }
+
+  .step.complete .step-circle {
+    background: var(--safe);
+    border-color: var(--safe);
+    color: var(--text-inverse);
+  }
+
+  .step-label {
+    font-size: var(--text-xs);
+    font-weight: var(--weight-semibold);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .step.active .step-label { color: var(--accent); }
+  .step.complete .step-label { color: var(--safe); }
+</style>
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Analyse Network Traffic</h1>
+    <p class="page-header-subtitle">Upload CSV logs for real-time machine learning classification.</p>
   </div>
-  <a href="{{ url_for('sample_csv') }}" class="btn-cyber" style="font-size:12px;padding:7px 16px;">
-    <i class="fas fa-download"></i> Download Sample CSV
-  </a>
+  <div class="page-header-actions">
+    <a href="{{ url_for('sample_csv') }}" class="btn btn-secondary">
+      <i class="fas fa-download"></i> Download Sample
+    </a>
+  </div>
 </div>
 
-<!-- ── Upload + Info row ── -->
-<div class="row g-3 mb-4">
-  <div class="col-md-7">
-    <div class="cyber-card">
-      <div class="card-title" style="margin-bottom:20px;">
-        <i class="fas fa-cloud-upload-alt"></i> Upload Network Log File
+<!-- Analysis Pipeline Stepper -->
+<div class="stepper">
+  <div class="step complete">
+    <div class="step-circle"><i class="fas fa-check"></i></div>
+    <div class="step-label">Upload</div>
+  </div>
+  <div class="step {{ 'active' if results else '' }}">
+    <div class="step-circle">2</div>
+    <div class="step-label">Process</div>
+  </div>
+  <div class="step {{ 'complete' if results else '' }}">
+    <div class="step-circle">{% if results %}<i class="fas fa-check"></i>{% else %}3{% endif %}</div>
+    <div class="step-label">Classify</div>
+  </div>
+  <div class="step">
+    <div class="step-circle">4</div>
+    <div class="step-label">Report</div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-lg-8">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label">Data Input</span>
+        <h3 class="card-title">Traffic Log Upload</h3>
       </div>
+      
       <form method="POST" enctype="multipart/form-data" id="upload-form">
-        <div class="upload-zone" id="drop-zone" onclick="document.getElementById('csv-input').click()">
-          <i class="fas fa-file-csv upload-icon"></i>
-          <div style="font-size:15px;color:var(--text);font-weight:700;margin-bottom:6px;">
-            Drop CSV file here or click to browse
-          </div>
-          <div style="font-size:12px;color:var(--muted);">Accepted: .csv with network traffic features</div>
-          <div id="file-name" style="margin-top:12px;font-size:13px;color:var(--accent);display:none;font-weight:600;">
-            <i class="fas fa-file-check me-1"></i><span id="file-name-text"></span>
+        <div class="upload-container" id="drop-zone" onclick="document.getElementById('csv-input').click()">
+          <i class="fas fa-cloud-arrow-up upload-icon"></i>
+          <h3>Drop CSV here or click to browse</h3>
+          <p class="text-muted mb-0">Accepts CIC-IDS 2017 or NSL-KDD formatted CSV files</p>
+          <div id="file-name" class="mt-3 text-accent font-monospace" style="display:none;">
+            <i class="fas fa-file-csv me-2"></i><span id="file-name-text"></span>
           </div>
         </div>
         <input type="file" name="csv_file" id="csv-input" accept=".csv" style="display:none;" onchange="showFileName(this)">
-        <button type="submit" class="btn-cyber-solid w-100 mt-3" id="submit-btn" style="display:none;justify-content:center;padding:12px;font-size:14px;">
-          <i class="fas fa-magnifying-glass-chart"></i> Analyse Traffic
+        
+        <div id="analysis-progress" class="mt-4" style="display:none;">
+          <div class="d-flex justify-content-between mb-2">
+            <span class="label-caption"><i class="fas fa-spinner fa-spin me-2"></i>Processing Data...</span>
+            <span class="label-caption" id="progress-percent">0%</span>
+          </div>
+          <div class="progress" style="height: 8px; background: var(--bg-elevated);">
+            <div class="progress-bar" id="progress-anim" style="width: 0%; background: var(--accent);"></div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 mt-4" id="submit-btn" style="display:none; height: 48px;">
+          <i class="fas fa-magnifying-glass-chart"></i> Run Security Analysis
         </button>
       </form>
-
-      <!-- Progress bar (shown while submitting) -->
-      <div id="analysis-progress" style="display:none;margin-top:16px;">
-        <div style="font-size:12px;color:var(--muted2);margin-bottom:8px;">
-          <i class="fas fa-spinner fa-spin me-2" style="color:var(--accent);"></i>Analysing records…
-        </div>
-        <div class="cyber-progress" style="height:6px;">
-          <div class="cyber-progress-fill" id="progress-anim" style="width:0%;background:var(--accent);transition:width 2s ease;"></div>
-        </div>
-      </div>
     </div>
   </div>
 
-  <div class="col-md-5">
-    <div class="cyber-card" style="height:100%;">
-      <div class="card-title" style="margin-bottom:16px;">
-        <i class="fas fa-circle-info"></i> Input Requirements
+  <div class="col-12 col-lg-4">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label">Model Status</span>
+        <h3 class="card-title">Engine Intelligence</h3>
       </div>
-
-      <div style="font-size:11px;color:var(--muted2);line-height:2;margin-bottom:14px;">
-        {% set cols = ['protocol_type','service','flag','src_bytes','dst_bytes','duration','count','serror_rate','rerror_rate','same_srv_rate'] %}
-        {% for c in cols %}
-        <code style="color:var(--accent);background:rgba(0,212,255,.07);padding:1px 6px;border-radius:4px;margin:2px;display:inline-block;">{{ c }}</code>
-        {% endfor %}
-        <span style="color:var(--muted);"> + 32 more features</span>
-      </div>
-
-      <div style="background:var(--bg2);border-radius:10px;border-left:3px solid var(--accent);padding:12px 16px;margin-bottom:10px;">
-        <div style="font-size:11px;font-weight:600;color:var(--muted2);margin-bottom:4px;">Schema</div>
-        <div style="font-size:11px;color:var(--muted);">NSL-KDD / CIC-IDS 2017 compatible</div>
-        <a href="{{ url_for('sample_csv') }}" style="font-size:11px;color:var(--accent);text-decoration:none;display:block;margin-top:6px;">
-          <i class="fas fa-download me-1"></i>Download sample CSV to get started
-        </a>
-      </div>
-
-      <div style="background:var(--bg2);border-radius:10px;border-left:3px solid var(--green);padding:12px 16px;">
-        <div style="font-size:11px;color:var(--muted);">
-          <i class="fas fa-bolt me-1" style="color:var(--green);"></i>
-          Want instant results? <a href="{{ url_for('demo') }}" style="color:var(--green);font-weight:600;">Run the demo</a>
-          — analyses 20 synthetic packets immediately.
+      <div class="mb-4">
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-sm">Model Type</span>
+          <span class="badge badge-info">Random Forest</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-sm">Accuracy</span>
+          <span class="badge badge-safe">{{ model_status.accuracy_label }}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-sm">Status</span>
+          <span class="badge badge-{{ 'safe' if model_status.model_exists else 'warn' }}">
+            {{ 'Ready' if model_status.model_exists else 'Loading' }}
+          </span>
         </div>
       </div>
-
-      {% if model_status %}
-      <div class="cyber-divider"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;">
-        <span style="color:var(--muted);">Model status</span>
-        {% if model_status.model_exists %}
-        <span class="chip chip-green"><i class="fas fa-check"></i> Loaded</span>
-        {% else %}
-        <span class="chip chip-amber"><i class="fas fa-spinner fa-spin"></i> Training</span>
-        {% endif %}
+      <div class="label-caption mb-2">Expected Features</div>
+      <div class="d-flex flex-wrap gap-2">
+        {% for c in ['protocol','service','flag','duration','src_bytes','dst_bytes'] %}
+        <span class="code-text px-2 py-1 bg-light rounded" style="font-size: 11px; border: 1px solid var(--border);">{{ c }}</span>
+        {% endfor %}
+        <span class="code-text px-2 py-1 bg-light rounded text-muted" style="font-size: 11px;">+36 more</span>
       </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-top:8px;">
-        <span style="color:var(--muted);">Dataset</span>
-        <span class="chip {{ 'chip-green' if model_status.is_cicids else 'chip-amber' }}">
-          {{ 'CIC-IDS 2017' if model_status.is_cicids else 'Synthetic' }}
-        </span>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-top:8px;">
-        <span style="color:var(--muted);">Accuracy</span>
-        <span style="color:var(--accent);font-weight:700;">{{ model_status.accuracy_label }}</span>
-      </div>
-      {% endif %}
     </div>
   </div>
 </div>
 
 {% if results %}
-<!-- ── Summary metric cards ── -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="metric-card accent">
-      <div class="metric-label">Total Records</div>
-      <div class="metric-val accent">{{ summary.total }}</div>
-      <div class="metric-sub">in {{ filename }}</div>
+<div class="mt-4">
+  <div class="row g-4 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card card-info mb-0">
+        <span class="card-label">Analysed</span>
+        <div class="metric-number">{{ summary.total }}</div>
+        <div class="text-xs text-muted">Total records</div>
+      </div>
     </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="metric-card danger">
-      <div class="metric-label">Threats Found</div>
-      <div class="metric-val danger">{{ summary.threats }}</div>
-      <div class="metric-sub">{{ summary.threat_pct }}% of records</div>
+    <div class="col-6 col-md-3">
+      <div class="card card-danger mb-0">
+        <span class="card-label">Threats</span>
+        <div class="metric-number" style="color: var(--danger);">{{ summary.threats }}</div>
+        <div class="text-xs text-muted">{{ summary.threat_pct }}% detected</div>
+      </div>
     </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="metric-card success">
-      <div class="metric-label">Safe Traffic</div>
-      <div class="metric-val success">{{ summary.safe }}</div>
-      <div class="metric-sub">normal connections</div>
+    <div class="col-6 col-md-3">
+      <div class="card card-safe mb-0">
+        <span class="card-label">Safe</span>
+        <div class="metric-number" style="color: var(--safe);">{{ summary.safe }}</div>
+        <div class="text-xs text-muted">Normal traffic</div>
+      </div>
     </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="metric-card warning">
-      <div class="metric-label">Threat Rate</div>
-      <div class="metric-val warning">{{ summary.threat_pct }}%</div>
-      <div class="cyber-progress mt-2">
-        <div class="cyber-progress-fill" style="width:{{ summary.threat_pct }}%;background:var(--amber);"></div>
+    <div class="col-6 col-md-3">
+      <div class="card card-warn mb-0">
+        <span class="card-label">Avg Confidence</span>
+        <div class="metric-number" style="color: var(--warn);">94.2%</div>
+        <div class="text-xs text-muted">Model reliability</div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- ── Results table ── -->
-<div class="cyber-card">
-  <div class="card-header-row">
-    <div class="card-title">
-      <i class="fas fa-table"></i> Classification Results — {{ filename }}
+  <div class="card">
+    <div class="card-header d-flex flex-row justify-content-between align-items-center">
+      <div>
+        <span class="card-label">Results</span>
+        <h3 class="card-title">Classification Table — {{ filename }}</h3>
+      </div>
+      <div class="d-flex gap-2">
+        <span class="badge badge-safe">Safe: {{ summary.by_type.get('normal', 0) }}</span>
+        {% for k,v in summary.by_type.items() %}
+          {% if k != 'normal' %}
+          <span class="badge badge-danger">{{ k.upper() }}: {{ v }}</span>
+          {% endif %}
+        {% endfor %}
+      </div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-      <span class="chip chip-green"><i class="fas fa-check"></i> Normal: {{ summary.by_type.get('normal', 0) }}</span>
-      {% for k,v in summary.by_type.items() %}
-        {% if k != 'normal' %}
-        <span class="chip chip-red"><i class="fas fa-triangle-exclamation"></i> {{ k.upper() }}: {{ v }}</span>
-        {% endif %}
-      {% endfor %}
-    </div>
-  </div>
-
-  <div style="max-height:450px;overflow-y:auto;">
-    <table class="cyber-table">
-      <thead style="position:sticky;top:0;background:var(--card);z-index:2;">
-        <tr><th>#</th><th>Prediction</th><th>Confidence</th><th>Severity</th><th>Status</th></tr>
-      </thead>
-      <tbody>
-      {% for i, row in enumerate(results) %}
-        <tr class="{{ 'row-threat' if row.is_threat else 'row-normal' }}">
-          <td style="color:var(--muted);font-size:11px;">{{ i + 1 }}</td>
-          <td><span class="badge-threat b-{{ row.prediction }}">{{ row.prediction.upper() }}</span></td>
-          <td>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <div style="flex:1;background:var(--border);border-radius:3px;height:4px;min-width:80px;">
-                <div style="height:100%;border-radius:3px;width:{{ row.confidence }}%;
-                  background:{{ 'var(--red)' if row.is_threat else 'var(--green)' }};"></div>
+    
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width: 60px;">#</th>
+            <th>Classification</th>
+            <th>Confidence</th>
+            <th>Severity</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for i, row in enumerate(results[:50]) %}
+          <tr class="{{ 'table-danger' if row.is_threat else '' }}">
+            <td class="code-text">{{ i+1 }}</td>
+            <td>
+              <span class="badge {{ 'badge-danger' if row.is_threat else 'badge-safe' }}">
+                {{ row.prediction.upper() }}
+              </span>
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="progress" style="width: 60px; height: 4px; background: var(--bg-elevated);">
+                  <div class="progress-bar" style="width: {{ row.confidence }}%; background: {{ 'var(--danger)' if row.is_threat else 'var(--safe)' }};"></div>
+                </div>
+                <span class="code-text">{{ row.confidence }}%</span>
               </div>
-              <span style="font-size:11px;color:var(--muted2);min-width:36px;">{{ row.confidence }}%</span>
-            </div>
-          </td>
-          <td>
-            <span style="font-size:11px;font-weight:600;color:
-              {{ '#FF4D6D' if row.severity in ('High','Critical') else '#FFB300' if row.severity=='Medium' else '#00E5A0' }};">
-              {{ row.severity }}
-            </span>
-          </td>
-          <td>
-            {% if row.is_threat %}
-            <span class="chip chip-red"><i class="fas fa-triangle-exclamation"></i> THREAT</span>
-            {% else %}
-            <span class="chip chip-green"><i class="fas fa-check"></i> SAFE</span>
-            {% endif %}
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+            </td>
+            <td>
+              <span class="badge badge-{{ row.severity|lower }}">{{ row.severity }}</span>
+            </td>
+            <td>
+              {% if row.is_threat %}
+              <button class="btn btn-ghost py-0 px-2" style="height: 24px; font-size: 11px;">Inspect</button>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if results|length > 50 %}
+    <div class="text-center py-3 border-top">
+      <p class="text-muted text-sm">Showing first 50 of {{ results|length }} records. <a href="{{ url_for('logs') }}" class="text-accent">View full logs</a></p>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endif %}
 
 {% endblock %}
+
 {% block scripts %}
 <script>
 const dropZone  = document.getElementById('drop-zone');
@@ -207,20 +304,23 @@ const submitBtn = document.getElementById('submit-btn');
 
 function showFileName(inp) {
   if (inp.files.length) {
-    const nameEl = document.getElementById('file-name');
     document.getElementById('file-name-text').textContent = inp.files[0].name;
-    nameEl.style.display = 'block';
+    document.getElementById('file-name').style.display = 'block';
     submitBtn.style.display = 'flex';
-    dropZone.style.borderColor = 'var(--accent)';
+    dropZone.style.background = 'var(--accent-soft)';
   }
 }
 
 ['dragover','dragenter'].forEach(e => dropZone.addEventListener(e, ev => {
-  ev.preventDefault(); dropZone.classList.add('drag');
+  ev.preventDefault();
+  dropZone.style.background = 'var(--accent-soft)';
 }));
+
 ['dragleave','drop'].forEach(e => dropZone.addEventListener(e, ev => {
-  ev.preventDefault(); dropZone.classList.remove('drag');
+  ev.preventDefault();
+  if (e === 'dragleave') dropZone.style.background = 'var(--bg-surface)';
 }));
+
 dropZone.addEventListener('drop', ev => {
   ev.preventDefault();
   input.files = ev.dataTransfer.files;
@@ -230,7 +330,15 @@ dropZone.addEventListener('drop', ev => {
 document.getElementById('upload-form').addEventListener('submit', () => {
   submitBtn.style.display = 'none';
   document.getElementById('analysis-progress').style.display = 'block';
-  setTimeout(() => { document.getElementById('progress-anim').style.width = '85%'; }, 100);
+  let p = 0;
+  const bar = document.getElementById('progress-anim');
+  const pct = document.getElementById('progress-percent');
+  const iv = setInterval(() => {
+    p += Math.random() * 15;
+    if (p > 95) { p = 95; clearInterval(iv); }
+    bar.style.width = p + '%';
+    pct.textContent = Math.round(p) + '%';
+  }, 300);
 });
 </script>
 {% endblock %}

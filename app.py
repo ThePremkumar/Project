@@ -161,8 +161,8 @@ def dashboard():
     chart_labels = [r["prediction"] for r in by_type]
     chart_values = [r["cnt"]        for r in by_type]
     chart_colors = [
-        "#00FFD1" if l == "normal" else
-        "#FF3366" if l in ("dos","r2l","u2r") else "#FF9500"
+        "#00875A" if l == "normal" else
+        "#E8003D" if l in ("dos","r2l","u2r") else "#E07000"
         for l in chart_labels
     ]
 
@@ -270,18 +270,28 @@ def logs():
 @app.route("/threats")
 @login_required
 def threats():
-    """Dedicated threats-only view with pagination."""
-    uid  = session["user_id"]
-    page = max(1, int(request.args.get("page", 1)))
-    per  = 50
+    """Dedicated threats-only view with pagination and search."""
+    uid    = session["user_id"]
+    page   = max(1, int(request.args.get("page", 1)))
+    q_type = request.args.get("type", "")
+    q_sev  = request.args.get("severity", "")
+    per    = 50
     offset = (page - 1) * per
+
+    # Build dynamic WHERE clause
+    filters = ["user_id=?", "is_threat=1"]
+    params  = [uid]
+    if q_type:  filters.append("prediction=?");  params.append(q_type)
+    if q_sev:   filters.append("severity=?");    params.append(q_sev)
+    where = " AND ".join(filters)
+
     with get_db() as db:
         total_threats = db.execute(
-            "SELECT COUNT(*) FROM logs WHERE user_id=? AND is_threat=1", (uid,)
+            f"SELECT COUNT(*) FROM logs WHERE {where}", params
         ).fetchone()[0]
         rows = db.execute(
-            "SELECT * FROM logs WHERE user_id=? AND is_threat=1 ORDER BY timestamp DESC LIMIT ? OFFSET ?",
-            (uid, per, offset)
+            f"SELECT * FROM logs WHERE {where} ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+            params + [per, offset]
         ).fetchall()
         by_type = db.execute(
             "SELECT prediction, COUNT(*) as cnt FROM logs WHERE user_id=? AND is_threat=1 GROUP BY prediction ORDER BY cnt DESC",
@@ -291,11 +301,18 @@ def threats():
             "SELECT severity, COUNT(*) as cnt FROM logs WHERE user_id=? AND is_threat=1 GROUP BY severity ORDER BY cnt DESC",
             (uid,)
         ).fetchall()
+
+    # Compute critical count in Python to avoid Jinja selectattr issues on SQLite Rows
+    critical_count = sum(r["cnt"] for r in by_severity if r["severity"] == "Critical")
+    high_count     = sum(r["cnt"] for r in by_severity if r["severity"] == "High")
+
     pages = max(1, (total_threats + per - 1) // per)
     return render_template("threats.html",
         threats=rows, total_threats=total_threats,
         by_type=by_type, by_severity=by_severity,
+        critical_count=critical_count, high_count=high_count,
         page=page, pages=pages, per=per,
+        q_type=q_type, q_sev=q_sev,
         model_status=get_model_status()
     )
 
@@ -386,6 +403,75 @@ def api_recent_critical():
             (uid,)
         ).fetchall()
     return jsonify([dict(r) for r in rows])
+
+@app.route("/api/system_info")
+@login_required
+def api_system_info():
+    """System health info: DB size, record counts, model file size."""
+    uid = session["user_id"]
+    with get_db() as db:
+        total  = db.execute("SELECT COUNT(*) FROM logs WHERE user_id=?", (uid,)).fetchone()[0]
+        threats= db.execute("SELECT COUNT(*) FROM logs WHERE user_id=? AND is_threat=1", (uid,)).fetchone()[0]
+        users  = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    db_size    = os.path.getsize(DB) if os.path.exists(DB) else 0
+    model_size = os.path.getsize(MODEL_PATH) if os.path.exists(MODEL_PATH) else 0
+    return jsonify({
+        "total_records": total,
+        "total_threats": threats,
+        "total_users":   users,
+        "db_size_mb":    round(db_size / 1024 / 1024, 2),
+        "model_size_kb": round(model_size / 1024, 1),
+        "db_path":       os.path.basename(DB),
+        "model_path":    os.path.basename(MODEL_PATH),
+    })
+
+@app.route("/api/confidence_dist")
+@login_required
+def api_confidence_dist():
+    """Confidence score distribution in 10% buckets."""
+    uid = session["user_id"]
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT confidence, is_threat FROM logs WHERE user_id=? ORDER BY timestamp DESC LIMIT 2000",
+            (uid,)
+        ).fetchall()
+    buckets = {f"{i*10}-{i*10+10}": 0 for i in range(10)}
+    for r in rows:
+        b = min(int(r["confidence"] // 10), 9)
+        key = f"{b*10}-{b*10+10}"
+        buckets[key] += 1
+    return jsonify([{"range": k, "count": v} for k, v in buckets.items()])
+
+# ── Routes: Profile / Password Change ─────────────────────────────────────
+@app.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    """Allow user to change their password."""
+    uid = session["user_id"]
+    if request.method == "POST":
+        current = request.form.get("current_pw", "")
+        new_pw  = request.form.get("new_pw", "")
+        confirm = request.form.get("confirm_pw", "")
+        with get_db() as db:
+            row = db.execute(
+                "SELECT * FROM users WHERE user_id=? AND password=?",
+                (uid, _hash(current))
+            ).fetchone()
+        if not row:
+            flash("Current password is incorrect.", "danger")
+        elif len(new_pw) < 6:
+            flash("New password must be at least 6 characters.", "danger")
+        elif new_pw != confirm:
+            flash("Passwords do not match.", "danger")
+        else:
+            with get_db() as db:
+                db.execute("UPDATE users SET password=? WHERE user_id=?",
+                           (_hash(new_pw), uid))
+            flash("Password updated successfully!", "success")
+    with get_db() as db:
+        user_row = db.execute("SELECT * FROM users WHERE user_id=?", (uid,)).fetchone()
+    return render_template("profile.html",
+        user=user_row, model_status=get_model_status())
 
 # ── Routes: Demo ───────────────────────────────────────────────────────────
 @app.route("/demo")

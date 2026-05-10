@@ -1,422 +1,193 @@
 {% extends "base.html" %}
 {% block title %}Detection Logs{% endblock %}
-
+{% block page_name %}Detection Logs{% endblock %}
 {% block content %}
 
-<style>
-  /* ── Logs Page Exclusive Styles ── */
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
-
-  .logs-stats-bar {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 24px;
-  }
-  .stat-tile {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 18px;
-    position: relative;
-    overflow: hidden;
-    transition: all .25s;
-  }
-  .stat-tile:hover { transform: translateY(-2px); border-color: rgba(0,212,255,0.3); }
-  .stat-tile::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-  }
-  .stat-tile.t-total::before   { background: linear-gradient(90deg, var(--accent), var(--purple)); }
-  .stat-tile.t-threat::before  { background: linear-gradient(90deg, var(--red), #ff8a65); }
-  .stat-tile.t-safe::before    { background: linear-gradient(90deg, var(--green), #26c6da); }
-  .stat-tile.t-rate::before    { background: linear-gradient(90deg, var(--amber), #ff6f00); }
-  .stat-tile-val {
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -1px;
-    line-height: 1;
-    margin-bottom: 4px;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .stat-tile-val.t-total  { color: var(--accent); }
-  .stat-tile-val.t-threat { color: var(--red); }
-  .stat-tile-val.t-safe   { color: var(--green); }
-  .stat-tile-val.t-rate   { color: var(--amber); }
-  .stat-tile-label {
-    font-size: 10px;
-    color: var(--muted2);
-    text-transform: uppercase;
-    letter-spacing: .1em;
-    font-weight: 600;
-  }
-  .stat-tile-icon {
-    position: absolute;
-    right: 14px;
-    bottom: 10px;
-    font-size: 36px;
-    opacity: .05;
-  }
-
-  /* Threat severity bar */
-  .sev-bar {
-    width: 100%;
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    margin-top: 8px;
-    overflow: hidden;
-  }
-  .sev-bar-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 1s ease;
-  }
-
-  /* Animated row entrance */
-  @keyframes rowSlideIn {
-    from { opacity: 0; transform: translateX(-6px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  #logs-table tbody tr {
-    animation: rowSlideIn .3s ease forwards;
-  }
-  #logs-table tbody tr:nth-child(n) { animation-delay: calc(var(--i, 0) * 20ms); }
-
-  /* Severity badge */
-  .sev-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 4px;
-    letter-spacing: .04em;
-  }
-  .sev-critical { background: rgba(255,77,109,.2);  color: #FF4D6D; border: 1px solid rgba(255,77,109,.4); }
-  .sev-high     { background: rgba(255,100,80,.15); color: #FF6450; border: 1px solid rgba(255,100,80,.3); }
-  .sev-medium   { background: rgba(255,179,0,.12);  color: #FFB300; border: 1px solid rgba(255,179,0,.3); }
-  .sev-low      { background: rgba(0,229,160,.1);   color: #00E5A0; border: 1px solid rgba(0,229,160,.25); }
-
-  /* Confidence mini-chart */
-  .conf-wrap {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .conf-bar {
-    flex: 1;
-    height: 5px;
-    background: var(--bg3);
-    border-radius: 3px;
-    min-width: 55px;
-    overflow: hidden;
-  }
-  .conf-fill {
-    height: 100%;
-    border-radius: 3px;
-  }
-  .conf-label {
-    font-size: 10px;
-    color: var(--muted2);
-    min-width: 30px;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  /* Filter toolbar */
-  .filter-toolbar {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 20px;
-  }
-  .cyber-select {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    padding: 8px 14px;
-    color: var(--text);
-    font-size: 12px;
-    outline: none;
-    font-family: 'Inter', sans-serif;
-    cursor: pointer;
-    transition: border-color .2s;
-  }
-  .cyber-select:focus { border-color: var(--accent); }
-
-  /* Empty + no-results states */
-  .empty-state {
-    text-align: center;
-    padding: 64px 28px;
-  }
-  .empty-state .empty-icon {
-    font-size: 52px;
-    color: var(--muted);
-    opacity: .15;
-    display: block;
-    margin-bottom: 18px;
-  }
-
-  /* Log ID mono style */
-  .log-id-cell {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10px;
-    color: var(--muted);
-    letter-spacing: .02em;
-  }
-
-  /* Timeline dot */
-  .timeline-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 6px;
-    flex-shrink: 0;
-  }
-
-  /* Pagination */
-  .page-btn {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    color: var(--muted2);
-    padding: 5px 12px;
-    border-radius: 7px;
-    font-size: 11px;
-    cursor: pointer;
-    transition: all .2s;
-  }
-  .page-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .page-btn.active { background: rgba(0,212,255,.12); border-color: var(--accent); color: var(--accent); }
-
-  /* Responsive */
-  @media (max-width: 768px) {
-    .logs-stats-bar { grid-template-columns: repeat(2, 1fr); }
-    .filter-toolbar { flex-direction: column; align-items: stretch; }
-  }
-</style>
-
-<!-- ── Topbar ── -->
-<div class="topbar">
-  <div>
-    <div class="page-title">Detection <span>Logs</span></div>
-    <div class="page-subtitle">
-      <i class="fas fa-database me-1"></i>
-      Full audit trail · Last 200 records displayed
-      {% if logs_stats.total > 200 %}
-        <span style="color:var(--amber);">&nbsp;· {{ logs_stats.total }} total in database</span>
-      {% endif %}
-    </div>
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Security Audit Trail</h1>
+    <p class="page-header-subtitle">Full history of detected threats and normal traffic activity.</p>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-    <a href="{{ url_for('export_logs') }}" class="btn-cyber" style="font-size:12px;padding:7px 14px;">
-      <i class="fas fa-file-arrow-down"></i> Export All
+  <div class="page-header-actions">
+    <a href="{{ url_for('export_logs') }}" class="btn btn-secondary">
+      <i class="fas fa-file-arrow-down"></i> Export CSV
     </a>
-    <button onclick="exportFiltered()" class="btn-cyber" style="font-size:12px;padding:7px 14px;border-color:var(--green);color:var(--green);">
-      <i class="fas fa-filter"></i> Export Filtered
-    </button>
   </div>
 </div>
 
-<!-- ── Stats Bar (server-computed, always accurate) ── -->
-<div class="logs-stats-bar">
-  <div class="stat-tile t-total">
-    <div class="stat-tile-val t-total">{{ logs_stats.total }}</div>
-    <div class="stat-tile-label"><i class="fas fa-database me-1"></i>Total Records</div>
-    <i class="fas fa-database stat-tile-icon"></i>
-  </div>
-  <div class="stat-tile t-threat">
-    <div class="stat-tile-val t-threat">{{ logs_stats.threats }}</div>
-    <div class="stat-tile-label"><i class="fas fa-triangle-exclamation me-1"></i>Threats Detected</div>
-    <div class="sev-bar">
-      <div class="sev-bar-fill" style="width:{{ logs_stats.threat_pct }}%;background:var(--red);"></div>
+<!-- Log Stats Tiles -->
+<div class="row g-4 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card card-info mb-0">
+      <span class="card-label">Database</span>
+      <div class="metric-number">{{ logs_stats.total }}</div>
+      <div class="text-xs text-muted">Total audit records</div>
     </div>
-    <i class="fas fa-skull-crossbones stat-tile-icon"></i>
   </div>
-  <div class="stat-tile t-safe">
-    <div class="stat-tile-val t-safe">{{ logs_stats.safe }}</div>
-    <div class="stat-tile-label"><i class="fas fa-shield-check me-1"></i>Safe Connections</div>
-    <div class="sev-bar">
-      <div class="sev-bar-fill" style="width:{{ 100 - logs_stats.threat_pct }}%;background:var(--green);"></div>
+  <div class="col-6 col-md-3">
+    <div class="card card-danger mb-0">
+      <span class="card-label">Threats</span>
+      <div class="metric-number" style="color: var(--danger);">{{ logs_stats.threats }}</div>
+      <div class="text-xs text-muted">Confirmed malicious</div>
     </div>
-    <i class="fas fa-shield-halved stat-tile-icon"></i>
   </div>
-  <div class="stat-tile t-rate">
-    <div class="stat-tile-val t-rate">{{ logs_stats.threat_pct }}%</div>
-    <div class="stat-tile-label"><i class="fas fa-gauge-high me-1"></i>Threat Rate</div>
-    <div class="sev-bar">
-      <div class="sev-bar-fill" style="width:{{ logs_stats.threat_pct }}%;background:var(--amber);"></div>
+  <div class="col-6 col-md-3">
+    <div class="card card-safe mb-0">
+      <span class="card-label">Safe</span>
+      <div class="metric-number" style="color: var(--safe);">{{ logs_stats.safe }}</div>
+      <div class="text-xs text-muted">Normal connections</div>
     </div>
-    <i class="fas fa-percent stat-tile-icon"></i>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card card-warn mb-0">
+      <span class="card-label">Threat Rate</span>
+      <div class="metric-number" style="color: var(--warn);">{{ logs_stats.threat_pct }}%</div>
+      <div class="text-xs text-muted">Global detection avg</div>
+    </div>
   </div>
 </div>
 
-<!-- ── Main Logs Card ── -->
-<div class="cyber-card">
-  {% if logs %}
-
-  <!-- Filter Toolbar -->
-  <div class="filter-toolbar">
-    <div class="input-wrap" style="flex:1;min-width:180px;">
-      <i class="fas fa-search input-icon" style="font-size:12px;"></i>
-      <input type="text" id="search" placeholder="Search logs by file, type, severity…"
-        class="cyber-input" style="padding-left:34px;padding-top:8px;padding-bottom:8px;font-size:12px;"
-        oninput="filterTable()">
-    </div>
-
-    <select id="filter-type" onchange="filterTable()" class="cyber-select">
-      <option value="">All Attack Types</option>
-      <option value="normal">✓ Normal</option>
-      <option value="dos">⚠ DoS</option>
-      <option value="probe">⚠ Probe</option>
-      <option value="r2l">⚠ R2L</option>
-      <option value="u2r">⚠ U2R</option>
-    </select>
-
-    <select id="filter-status" onchange="filterTable()" class="cyber-select">
-      <option value="">All Status</option>
-      <option value="1">🔴 Threats Only</option>
-      <option value="0">🟢 Safe Only</option>
-    </select>
-
-    <select id="filter-severity" onchange="filterTable()" class="cyber-select">
-      <option value="">All Severities</option>
-      <option value="critical">Critical</option>
-      <option value="high">High</option>
-      <option value="medium">Medium</option>
-      <option value="low">Low</option>
-    </select>
-
-    <button onclick="clearFilters()" class="btn-cyber" style="font-size:11px;padding:7px 12px;border-color:var(--muted);color:var(--muted);">
-      <i class="fas fa-xmark"></i> Clear
-    </button>
+<!-- Filters Card -->
+<div class="card">
+  <div class="card-header mb-3">
+    <span class="card-label">Filter Data</span>
+    <h3 class="card-title">Search and Refine Logs</h3>
   </div>
-
-  <!-- Row count header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-    <div style="font-size:12px;color:var(--muted2);" id="row-count">
-      Showing <strong id="visible-count" style="color:var(--accent);">{{ logs|length }}</strong>
-      of <strong style="color:var(--muted2);">{{ logs|length }}</strong> displayed records
+  <div class="row g-3">
+    <div class="col-12 col-md-4">
+      <label class="form-label">Search</label>
+      <div class="position-relative">
+        <i class="fas fa-search position-absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px;"></i>
+        <input type="text" id="search" class="form-control" style="padding-left: 36px;" placeholder="Search file, type, timestamp..." oninput="filterTable()">
+      </div>
     </div>
-    <div style="display:flex;gap:8px;font-size:11px;flex-wrap:wrap;">
-      <span class="chip chip-red"><i class="fas fa-triangle-exclamation"></i> {{ logs_stats.threats }} threats</span>
-      <span class="chip chip-green"><i class="fas fa-check"></i> {{ logs_stats.safe }} safe</span>
-      <span class="chip chip-accent"><i class="fas fa-layer-group"></i> {{ logs_stats.total }} total</span>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Attack Type</label>
+      <select id="filter-type" class="form-control" onchange="filterTable()">
+        <option value="">All Types</option>
+        <option value="normal">Normal</option>
+        <option value="dos">DoS</option>
+        <option value="probe">Probe</option>
+        <option value="r2l">R2L</option>
+        <option value="u2r">U2R</option>
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Severity</label>
+      <select id="filter-severity" class="form-control" onchange="filterTable()">
+        <option value="">All Severity</option>
+        <option value="critical">Critical</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label">Status</label>
+      <select id="filter-status" class="form-control" onchange="filterTable()">
+        <option value="">All Status</option>
+        <option value="1">Threats Only</option>
+        <option value="0">Safe Only</option>
+      </select>
+    </div>
+    <div class="col-6 col-md-2 d-flex align-items-end">
+      <button class="btn btn-secondary w-100" onclick="clearFilters()">
+        <i class="fas fa-xmark"></i> Clear
+      </button>
     </div>
   </div>
+</div>
 
-  <div style="overflow-x:auto;">
-    <table class="cyber-table" id="logs-table">
+<!-- Logs Table Card -->
+<div class="card">
+  <div class="card-header d-flex flex-row justify-content-between align-items-center">
+    <div>
+      <span class="card-label">Audit Table</span>
+      <h3 class="card-title">Detection Log History</h3>
+    </div>
+    <div class="text-xs text-muted">
+      Showing <span id="visible-count" class="text-primary font-weight-bold">{{ logs|length }}</span> of {{ logs|length }} loaded records
+    </div>
+  </div>
+  
+  <div class="table-responsive">
+    <table class="table" id="logs-table">
       <thead>
         <tr>
-          <th style="width:60px;">ID</th>
+          <th>ID</th>
           <th>Source File</th>
-          <th>Attack Type</th>
-          <th style="width:140px;">Confidence</th>
+          <th>Type</th>
+          <th>Confidence</th>
           <th>Severity</th>
-          <th>Status</th>
           <th>Timestamp</th>
         </tr>
       </thead>
       <tbody>
-      {% for row in logs %}
-      <tr class="{{ 'row-threat' if row.is_threat else 'row-normal' }}"
-          data-pred="{{ row.prediction }}"
-          data-threat="{{ '1' if row.is_threat else '0' }}"
-          data-severity="{{ row.severity|lower }}"
-          data-text="{{ (row.filename or '') + ' ' + row.prediction + ' ' + row.severity + ' ' + row.timestamp }}"
-          style="--i: {{ loop.index }};">
-        <td class="log-id-cell">#{{ row.log_id }}</td>
-        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ row.filename }}">
-          <i class="fas fa-file-csv me-1" style="color:var(--muted);font-size:10px;"></i>{{ row.filename or '—' }}
-        </td>
-        <td>
-          <span class="badge-threat b-{{ row.prediction }}">
-            {{ row.prediction.upper() }}
-          </span>
-        </td>
-        <td>
-          <div class="conf-wrap">
-            <div class="conf-bar">
-              <div class="conf-fill" style="width:{{ row.confidence }}%;
-                background:{{ 'var(--red)' if row.is_threat else 'var(--green)' }};"></div>
+        {% for row in logs %}
+        <tr data-text="{{ (row.filename or '')|lower }} {{ row.prediction|lower }} {{ row.severity|lower }} {{ row.timestamp|lower }}"
+            data-pred="{{ row.prediction }}"
+            data-threat="{{ '1' if row.is_threat else '0' }}"
+            data-severity="{{ row.severity|lower }}">
+          <td class="code-text">#{{ row.log_id }}</td>
+          <td class="text-truncate" style="max-width: 150px;" title="{{ row.filename }}">
+            <i class="fas fa-file-csv me-1 opacity-50"></i>{{ row.filename or '—' }}
+          </td>
+          <td>
+            <span class="badge {{ 'badge-danger' if row.is_threat else 'badge-safe' }}">
+              {{ row.prediction.upper() }}
+            </span>
+          </td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress" style="width: 60px; height: 4px; background: var(--bg-elevated);">
+                <div class="progress-bar" style="width: {{ row.confidence }}%; background: {{ 'var(--danger)' if row.is_threat else 'var(--safe)' }};"></div>
+              </div>
+              <span class="code-text">{{ row.confidence }}%</span>
             </div>
-            <span class="conf-label">{{ row.confidence }}%</span>
-          </div>
-        </td>
-        <td>
-          {% if row.severity == 'Critical' %}
-          <span class="sev-badge sev-critical"><i class="fas fa-circle-exclamation"></i> Critical</span>
-          {% elif row.severity == 'High' %}
-          <span class="sev-badge sev-high"><i class="fas fa-arrow-up"></i> High</span>
-          {% elif row.severity == 'Medium' %}
-          <span class="sev-badge sev-medium"><i class="fas fa-minus"></i> Medium</span>
-          {% else %}
-          <span class="sev-badge sev-low"><i class="fas fa-arrow-down"></i> Low</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if row.is_threat %}
-          <span class="chip chip-red" style="font-size:10px;"><i class="fas fa-triangle-exclamation"></i> THREAT</span>
-          {% else %}
-          <span class="chip chip-green" style="font-size:10px;"><i class="fas fa-check"></i> SAFE</span>
-          {% endif %}
-        </td>
-        <td style="color:var(--muted);font-size:11px;white-space:nowrap;font-family:'JetBrains Mono',monospace;">
-          {{ row.timestamp }}
-        </td>
-      </tr>
-      {% endfor %}
+          </td>
+          <td>
+            <span class="badge badge-{{ row.severity|lower }}">{{ row.severity }}</span>
+          </td>
+          <td class="code-text">{{ row.timestamp }}</td>
+        </tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
-
-  <div id="no-results" style="display:none;text-align:center;padding:32px;color:var(--muted);font-size:13px;">
-    <i class="fas fa-filter me-2" style="color:var(--amber);"></i>No records match your current filters
-    <a onclick="clearFilters()" style="color:var(--accent);cursor:pointer;margin-left:8px;">Clear filters</a>
-  </div>
-
-  {% else %}
-  <div class="empty-state">
-    <i class="fas fa-database empty-icon"></i>
-    <div style="font-size:16px;color:var(--muted2);font-weight:700;margin-bottom:8px;">No detection logs yet</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:24px;">
-      Run an analysis to start recording threat detection results
-    </div>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
-      <a href="{{ url_for('analyse') }}" class="btn-cyber-solid">
-        <i class="fas fa-upload"></i> Upload CSV
-      </a>
-      <a href="{{ url_for('demo') }}" class="btn-cyber">
-        <i class="fas fa-bolt"></i> Run Demo
-      </a>
-    </div>
+  
+  {% if not logs %}
+  <div class="text-center py-5">
+    <i class="fas fa-database fa-3x mb-3 opacity-10"></i>
+    <p class="text-muted">No detection logs found in database.</p>
+    <a href="{{ url_for('analyse') }}" class="btn btn-primary btn-sm">Analyse Now</a>
   </div>
   {% endif %}
+
+  <div id="no-results" class="text-center py-5" style="display: none;">
+    <i class="fas fa-filter fa-3x mb-3 opacity-10"></i>
+    <p class="text-muted">No records match your filter criteria.</p>
+    <button class="btn btn-ghost" onclick="clearFilters()">Reset Filters</button>
+  </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-const tableRows = () => document.querySelectorAll('#logs-table tbody tr');
-const totalDisplayed = {{ logs|length }};
-
 function filterTable() {
-  const q        = (document.getElementById('search')?.value || '').toLowerCase();
-  const type     = document.getElementById('filter-type')?.value || '';
-  const status   = document.getElementById('filter-status')?.value || '';
-  const severity = document.getElementById('filter-severity')?.value || '';
-  let visible    = 0;
+  const q        = document.getElementById('search').value.toLowerCase();
+  const type     = document.getElementById('filter-type').value;
+  const status   = document.getElementById('filter-status').value;
+  const severity = document.getElementById('filter-severity').value;
+  
+  const rows = document.querySelectorAll('#logs-table tbody tr');
+  let visible = 0;
 
-  tableRows().forEach(row => {
-    const text   = (row.dataset.text || '').toLowerCase();
-    const pred   = row.dataset.pred  || '';
-    const threat = row.dataset.threat || '';
-    const sev    = (row.dataset.severity || '').toLowerCase();
+  rows.forEach(row => {
+    const text   = row.getAttribute('data-text');
+    const pred   = row.getAttribute('data-pred');
+    const threat = row.getAttribute('data-threat');
+    const sev    = row.getAttribute('data-severity');
 
     const matchQ    = !q        || text.includes(q);
     const matchT    = !type     || pred === type;
@@ -428,46 +199,16 @@ function filterTable() {
     if (show) visible++;
   });
 
-  const noEl = document.getElementById('no-results');
-  if (noEl) noEl.style.display = visible === 0 ? 'block' : 'none';
-
-  const countEl = document.getElementById('visible-count');
-  if (countEl) countEl.textContent = visible;
+  document.getElementById('visible-count').textContent = visible;
+  document.getElementById('no-results').style.display = (visible === 0 && rows.length > 0) ? 'block' : 'none';
 }
 
 function clearFilters() {
-  const ids = ['search','filter-type','filter-status','filter-severity'];
-  ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
+  document.getElementById('search').value = '';
+  document.getElementById('filter-type').value = '';
+  document.getElementById('filter-status').value = '';
+  document.getElementById('filter-severity').value = '';
   filterTable();
 }
-
-function exportFiltered() {
-  const rows = [...tableRows()].filter(r => r.style.display !== 'none');
-  if (!rows.length) { alert('No visible rows to export.'); return; }
-  const headers = ['ID','File','Prediction','Confidence','Severity','Status','Timestamp'];
-  const lines = [headers.join(',')];
-  rows.forEach(row => {
-    const cells = [...row.querySelectorAll('td')].map(td => `"${td.textContent.trim().replace(/"/g,'""')}"`);
-    lines.push(cells.join(','));
-  });
-  const blob = new Blob([lines.join('\n')], { type:'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `detection_logs_filtered_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-}
-
-// Animate progress bars on load
-document.addEventListener('DOMContentLoaded', () => {
-  // Re-trigger sev-bar animations
-  document.querySelectorAll('.sev-bar-fill, .conf-fill').forEach(el => {
-    const w = el.style.width;
-    el.style.width = '0%';
-    requestAnimationFrame(() => { el.style.width = w; });
-  });
-});
 </script>
 {% endblock %}

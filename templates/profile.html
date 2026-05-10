@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}User Profile{% endblock %}
+{% block page_name %}User Profile{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>User Profile</h1>
+    <p class="page-header-subtitle">Manage your account settings and view system diagnostics.</p>
+  </div>
+</div>
+
+<div class="card card-info mb-4">
+  <div class="d-flex align-items-center gap-4">
+    <div class="rounded-3 d-flex align-items-center justify-content-center" 
+         style="width: 80px; height: 80px; background: linear-gradient(135deg, var(--accent) 0%, #7C3AED 100%); color: var(--text-inverse); font-size: 32px; font-weight: var(--weight-bold);">
+      {{ user.username[0].upper() }}
+    </div>
+    <div>
+      <h2 class="mb-1">{{ user.username }}</h2>
+      <div class="d-flex align-items-center gap-2 text-sm">
+        <span class="badge badge-info"><i class="fas fa-shield-halved me-1"></i> Security Analyst</span>
+        <span class="text-muted">Joined: {{ user.created[:10] }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Security Settings -->
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label">Security</span>
+        <h3 class="card-title">Update Password</h3>
+      </div>
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">Current Password</label>
+          <input type="password" name="current_pw" class="form-control" required placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input type="password" name="new_pw" class="form-control" required placeholder="Min. 6 characters">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" name="confirm_pw" class="form-control" required placeholder="Re-enter password">
+        </div>
+        <button type="submit" class="btn btn-primary w-100 mt-3">
+          <i class="fas fa-floppy-disk"></i> Save Changes
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- System Diagnostics -->
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label">Diagnostics</span>
+        <h3 class="card-title">System Health Metrics</h3>
+      </div>
+      <div id="sys-info-panel" style="min-height: 250px;">
+        <div class="d-flex flex-column align-items-center justify-content-center h-100 py-5">
+          <i class="fas fa-spinner fa-spin fa-2x mb-3" style="color: var(--accent);"></i>
+          <p class="text-muted text-sm">Loading system diagnostics...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('/api/system_info')
+    .then(r => r.json())
+    .then(data => {
+      const p = document.getElementById('sys-info-panel');
+      p.innerHTML = `
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <tbody>
+              <tr>
+                <td class="text-muted text-xs">Analysed Records</td>
+                <td class="text-end font-monospace font-weight-bold">${data.total_records.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td class="text-muted text-xs">Malicious Events</td>
+                <td class="text-end font-monospace text-danger font-weight-bold">${data.total_threats.toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td class="text-muted text-xs">Active Analysts</td>
+                <td class="text-end font-monospace text-primary font-weight-bold">${data.total_users}</td>
+              </tr>
+              <tr>
+                <td class="text-muted text-xs">Database Path</td>
+                <td class="text-end font-monospace text-truncate" style="max-width: 150px;" title="${data.db_path}">${data.db_path}</td>
+              </tr>
+              <tr>
+                <td class="text-muted text-xs">Database Size</td>
+                <td class="text-end font-monospace text-info font-weight-bold">${data.db_size_mb} MB</td>
+              </tr>
+              <tr>
+                <td class="text-muted text-xs">Model Size</td>
+                <td class="text-end font-monospace text-accent font-weight-bold">${data.model_size_kb} KB</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    })
+    .catch(() => {
+      document.getElementById('sys-info-panel').innerHTML = `
+        <div class="text-center py-5">
+          <i class="fas fa-triangle-exclamation fa-2x text-danger mb-2"></i>
+          <p class="text-danger">Failed to load diagnostics</p>
+        </div>
+      `;
+    });
+});
+</script>
+{% endblock %}

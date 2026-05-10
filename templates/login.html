@@ -1,142 +1,146 @@
 {% extends "base.html" %}
 {% block title %}Secure Login{% endblock %}
 {% block content %}
-
 <style>
-  .auth-bg {
-    position: fixed; inset: 0; z-index: 0;
-    background: radial-gradient(ellipse at 20% 50%, rgba(0,212,255,0.06) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 20%, rgba(139,92,246,0.06) 0%, transparent 60%),
-                radial-gradient(ellipse at 60% 80%, rgba(255,77,109,0.04) 0%, transparent 50%);
+  body {
+    background-color: var(--bg-elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
   }
-  .auth-orb {
-    position: absolute; border-radius: 50%;
-    filter: blur(60px); pointer-events: none; animation: orbFloat 8s ease-in-out infinite;
-  }
-  .auth-orb:nth-child(1) { width:300px;height:300px; background:rgba(0,212,255,.05); top:-80px;left:-60px; animation-delay:0s; }
-  .auth-orb:nth-child(2) { width:200px;height:200px; background:rgba(139,92,246,.06); bottom:10%;right:5%; animation-delay:3s; }
-  .auth-orb:nth-child(3) { width:150px;height:150px; background:rgba(0,229,160,.04); top:40%;right:15%; animation-delay:5s; }
-  @keyframes orbFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
 
-  body { display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px; }
-  .auth-wrap { width:100%; max-width:430px; position:relative; z-index:1; }
-  .auth-logo-ring {
-    width:72px; height:72px;
-    background: linear-gradient(135deg, var(--accent), var(--purple));
-    border-radius: 20px;
-    display: inline-flex; align-items:center; justify-content:center;
-    font-size:30px; color:white;
-    box-shadow: 0 8px 32px rgba(0,212,255,0.4);
-    margin-bottom: 18px;
-    animation: logoBreath 4s ease-in-out infinite;
+  .auth-container {
+    display: flex;
+    width: 100%;
+    max-width: 900px;
+    background: var(--bg-surface);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    margin: 24px;
   }
-  @keyframes logoBreath {
-    0%,100% { box-shadow: 0 8px 32px rgba(0,212,255,.4); }
-    50% { box-shadow: 0 8px 48px rgba(0,212,255,.6), 0 0 0 8px rgba(0,212,255,.06); }
+
+  .auth-side-panel {
+    flex: 1;
+    background: linear-gradient(135deg, var(--accent) 0%, #7C3AED 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+    color: var(--text-inverse);
+    text-align: center;
   }
-  .auth-card {
-    background: rgba(15, 27, 53, 0.85);
-    border: 1px solid rgba(0,212,255,.18);
-    border-radius: 18px;
-    padding: 32px;
-    backdrop-filter: blur(20px);
-    box-shadow: 0 24px 80px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.03);
+
+  .auth-side-panel i {
+    font-size: 64px;
+    margin-bottom: 24px;
   }
-  .auth-divider {
-    display: flex; align-items:center; gap:12px; margin:20px 0;
-    color: var(--muted); font-size:11px;
+
+  .auth-side-panel h1 {
+    color: var(--text-inverse);
+    font-size: var(--text-3xl);
+    margin-bottom: 12px;
   }
-  .auth-divider::before, .auth-divider::after {
-    content:''; flex:1; height:1px; background:var(--border);
+
+  .auth-side-panel p {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: var(--text-base);
   }
-  .demo-box {
-    background: rgba(0,212,255,.05);
-    border: 1px solid rgba(0,212,255,.15);
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 11px;
-    color: var(--muted2);
-    margin-top: 18px;
-    display: flex; align-items:center; gap:10px;
+
+  .auth-form-panel {
+    width: 480px;
+    padding: 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
-  .demo-box i { color: var(--accent); font-size: 14px; }
-  .demo-cred { color: var(--accent); font-weight: 700; font-family: monospace; font-size: 12px; }
+
+  .auth-form-panel h2 {
+    margin-bottom: 8px;
+  }
+
+  .auth-form-panel p {
+    color: var(--text-muted);
+    margin-bottom: 32px;
+  }
+
+  .demo-account {
+    background: var(--info-soft);
+    border: 1px solid var(--info);
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 24px;
+    font-size: var(--text-sm);
+    color: var(--info);
+  }
+
+  @media (max-width: 768px) {
+    .auth-side-panel { display: none; }
+    .auth-container { max-width: 480px; }
+    .auth-form-panel { width: 100%; padding: 32px; }
+  }
 </style>
 
-<div class="auth-bg">
-  <div class="auth-orb"></div>
-  <div class="auth-orb"></div>
-  <div class="auth-orb"></div>
-</div>
-
-<div class="auth-wrap">
-  <div style="text-align:center; margin-bottom:28px;">
-    <div class="auth-logo-ring"><i class="fas fa-shield-halved"></i></div>
-    <h4 style="font-weight:800; font-size:22px; letter-spacing:-.5px;">CyberSentinel</h4>
-    <p style="color:var(--muted2); font-size:13px; margin-top:5px;">
-      Intelligent Cyber Threat Detection System
-    </p>
+<div class="auth-container">
+  <div class="auth-side-panel">
+    <i class="fas fa-shield-halved"></i>
+    <h1>CyberSentinel</h1>
+    <p>Intelligent Cyber Threat Detection System powered by Advanced Machine Learning.</p>
   </div>
-
-  <div class="auth-card">
-    <div style="font-size:11px; font-weight:700; color:var(--accent); text-transform:uppercase; letter-spacing:.12em; margin-bottom:22px; display:flex; align-items:center; gap:8px;">
-      <i class="fas fa-lock"></i> Secure Authentication
-    </div>
+  <div class="auth-form-panel">
+    <h2>Welcome Back</h2>
+    <p>Enter your credentials to access the system.</p>
 
     <form method="POST" id="login-form">
-      <div style="margin-bottom:16px;">
-        <label class="input-label">Username</label>
-        <div class="input-wrap">
-          <i class="fas fa-user input-icon"></i>
-          <input type="text" name="username" id="username" required placeholder="Enter your username"
-            class="cyber-input" autocomplete="username">
-        </div>
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" id="username" class="form-control" required 
+               placeholder="Enter your username" autocomplete="username">
       </div>
-      <div style="margin-bottom:24px;">
-        <label class="input-label">Password</label>
-        <div class="input-wrap">
-          <i class="fas fa-lock input-icon"></i>
-          <input type="password" name="password" id="password" required placeholder="Enter your password"
-            class="cyber-input" autocomplete="current-password">
-          <button type="button" onclick="togglePw('password', this)"
-            style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:0;">
-            <i class="fas fa-eye" id="pw-toggle-icon"></i>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <div class="position-relative">
+          <input type="password" name="password" id="password" class="form-control" required 
+                 placeholder="••••••••" autocomplete="current-password">
+          <button type="button" onclick="togglePw('password', this)" 
+                  style="position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer;">
+            <i class="fas fa-eye"></i>
           </button>
         </div>
       </div>
-      <button type="submit" class="btn-cyber-solid w-100" id="login-btn" style="justify-content:center; font-size:14px; padding:12px;">
+      <button type="submit" class="btn btn-primary w-100" id="login-btn">
         <i class="fas fa-right-to-bracket"></i> Sign In
       </button>
     </form>
 
-    <div class="auth-divider">New to CyberSentinel?</div>
-    <a href="{{ url_for('register') }}" class="btn-cyber w-100" style="justify-content:center;">
-      <i class="fas fa-user-plus"></i> Create Account
-    </a>
+    <div class="text-center mt-4">
+      <span style="font-size: var(--text-sm); color: var(--text-muted);">Don't have an account?</span>
+      <a href="{{ url_for('register') }}" style="color: var(--accent); font-weight: var(--weight-semibold); text-decoration: none; font-size: var(--text-sm);">Request Access</a>
+    </div>
 
-    <div class="demo-box">
-      <i class="fas fa-flask-vial"></i>
-      <div>Demo: <span class="demo-cred">admin</span> / <span class="demo-cred">admin123</span></div>
+    <div class="demo-account">
+      <i class="fas fa-info-circle me-1"></i>
+      <strong>Demo Account:</strong> admin / admin123
     </div>
   </div>
-
-  <div style="text-align:center; margin-top:20px; font-size:10px; color:var(--muted);">
-    <i class="fas fa-lock me-1"></i> Secured with SHA-256 password hashing
-  </div>
 </div>
-
 {% endblock %}
+
 {% block scripts %}
 <script>
 function togglePw(id, btn) {
   const inp = document.getElementById(id);
   const icon = btn.querySelector('i');
-  if (inp.type === 'password') { inp.type = 'text'; icon.className = 'fas fa-eye-slash'; }
-  else { inp.type = 'password'; icon.className = 'fas fa-eye'; }
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  icon.className = inp.type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
 }
+
 document.getElementById('login-form').addEventListener('submit', function() {
   const btn = document.getElementById('login-btn');
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in…';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
   btn.disabled = true;
 });
 </script>
