@@ -494,6 +494,43 @@ def demo():
     flash("Demo analysis complete — 20 synthetic packets analysed.", "info")
     return redirect(url_for("dashboard"))
 
+# ── Routes: Live Monitor ──────────────────────────────────────────────────
+@app.route("/monitor")
+@login_required
+def monitor():
+    return render_template("monitor.html", model_status=get_model_status())
+
+@app.route("/api/live_packet")
+@login_required
+def api_live_packet():
+    """Simulates one live incoming packet and records it."""
+    # Generate 1 synthetic packet
+    df = make_synthetic(1).drop(columns=["label"], errors="ignore")
+    result_df = detector.predict_df(df)
+    row = result_df.iloc[0]
+    
+    # Save to DB for history
+    with get_db() as db:
+        db.execute(
+            """INSERT INTO logs 
+               (user_id, filename, traffic_data, prediction, 
+                confidence, severity, is_threat, timestamp)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (session["user_id"], "live_stream", "{}",
+             row["prediction"], float(row["confidence"]),
+             row["severity"], int(row["is_threat"]),
+             datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+    
+    return jsonify({
+        "prediction": row["prediction"],
+        "confidence": float(row["confidence"]),
+        "severity": row["severity"],
+        "badge_color": row["badge_color"],
+        "is_threat": bool(row["is_threat"]),
+        "timestamp": datetime.now().strftime("%H:%M:%S")
+    })
+
 # ── Routes: Sample CSV download ────────────────────────────────────────────
 @app.route("/sample_csv")
 @login_required

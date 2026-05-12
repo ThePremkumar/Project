@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}Live Monitor{% endblock %}
+{% block page_name %}Real-Time Threat Monitoring{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-header-title">
+        <h2>Live Traffic Analysis</h2>
+        <p class="page-header-subtitle">Continuous monitoring of incoming network packets for potential security breaches.</p>
+    </div>
+    <div class="page-header-actions">
+        <div id="status-badge" class="badge badge-safe">
+            <i class="fas fa-circle-dot fa-fade me-2"></i>Live System Active
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Real-time Chart -->
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-header">
+                <span class="card-label">Traffic Velocity</span>
+                <h3 class="card-title">Threat Signal Timeline</h3>
+            </div>
+            <div style="height: 300px;">
+                <canvas id="liveChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Stats -->
+    <div class="col-lg-4">
+        <div class="card h-100 card-info">
+            <div class="card-header">
+                <span class="card-label">Session Summary</span>
+                <h3 class="card-title">Current Stream Stats</h3>
+            </div>
+            <div class="d-flex flex-column gap-3 mt-2">
+                <div class="d-flex justify-content-between align-items-center p-3 rounded bg-light border">
+                    <div>
+                        <div class="label-caption">Packets Inspected</div>
+                        <div class="metric-number" id="session-total">0</div>
+                    </div>
+                    <i class="fas fa-microchip fa-2xl text-muted opacity-25"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-center p-3 rounded border" style="background: var(--danger-soft);">
+                    <div>
+                        <div class="label-caption" style="color: var(--danger);">Threats Blocked</div>
+                        <div class="metric-number" id="session-threats" style="color: var(--danger);">0</div>
+                    </div>
+                    <i class="fas fa-shield-virus fa-2xl text-danger opacity-25"></i>
+                </div>
+                <div class="d-flex justify-content-between align-items-center p-3 rounded border" style="background: var(--safe-soft);">
+                    <div>
+                        <div class="label-caption" style="color: var(--safe);">Safe Traffic</div>
+                        <div class="metric-number" id="session-safe" style="color: var(--safe);">0</div>
+                    </div>
+                    <i class="fas fa-check-double fa-2xl text-safe opacity-25"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Event Feed -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex flex-row justify-content-between align-items-center">
+                <div>
+                    <span class="card-label">Event Stream</span>
+                    <h3 class="card-title">Live Detection Feed</h3>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="clearFeed()">
+                    <i class="fas fa-trash-can"></i> Clear Feed
+                </button>
+            </div>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table" id="live-feed-table">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Prediction</th>
+                            <th>Severity</th>
+                            <th>Confidence</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="live-feed-body">
+                        <tr id="empty-row">
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                <i class="fas fa-spinner fa-spin me-2"></i> Initializing live stream...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Stats tracking
+    let totalPackets = 0;
+    let totalThreats = 0;
+    let totalSafe = 0;
+
+    // Chart Setup
+    const ctx = document.getElementById('liveChart').getContext('2d');
+    const chartData = {
+        labels: [],
+        datasets: [
+            {
+                label: 'Threat Intensity',
+                data: [],
+                borderColor: '#E8003D',
+                backgroundColor: 'rgba(232, 0, 61, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 0
+            },
+            {
+                label: 'Traffic Volume',
+                data: [],
+                borderColor: '#0066FF',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                tension: 0.4,
+                pointRadius: 0
+            }
+        ]
+    };
+
+    const liveChart = new Chart(ctx, {
+        type: 'line',
+        data: chartData,
+        options: {
+            ...lightChartDefaults,
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            scales: {
+                x: {
+                    ...lightChartDefaults.scales.x,
+                    display: true,
+                    title: { display: false }
+                },
+                y: {
+                    ...lightChartDefaults.scales.y,
+                    beginAtZero: true,
+                    max: 100
+                }
+            },
+            plugins: {
+                ...lightChartDefaults.plugins,
+                legend: { position: 'top', align: 'end' }
+            }
+        }
+    });
+
+    // Feed Management
+    function addFeedRow(packet) {
+        const tbody = document.getElementById('live-feed-body');
+        const emptyRow = document.getElementById('empty-row');
+        if (emptyRow) emptyRow.remove();
+
+        const tr = document.createElement('tr');
+        tr.style.animation = 'fadeIn 0.5s ease-out forwards';
+        
+        const badgeClass = packet.is_threat ? `badge-${packet.badge_color}` : 'badge-safe';
+        
+        tr.innerHTML = `
+            <td class="code-text">${packet.timestamp}</td>
+            <td>
+                <span class="badge ${badgeClass}">
+                    ${packet.prediction.toUpperCase()}
+                </span>
+            </td>
+            <td>
+                <span class="text-${packet.badge_color} fw-bold">
+                    ${packet.severity}
+                </span>
+            </td>
+            <td>
+                <div class="progress" style="height: 6px; width: 80px;">
+                    <div class="progress-bar bg-${packet.badge_color}" style="width: ${packet.confidence}%"></div>
+                </div>
+                <small class="text-muted mt-1 d-block">${packet.confidence}%</small>
+            </td>
+            <td>
+                <button class="btn btn-ghost btn-sm p-1">
+                    <i class="fas fa-eye"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.prepend(tr);
+
+        // Keep only last 50 rows
+        if (tbody.children.length > 50) {
+            tbody.removeChild(tbody.lastChild);
+        }
+    }
+
+    function updateStats(packet) {
+        totalPackets++;
+        if (packet.is_threat) totalThreats++;
+        else totalSafe++;
+
+        document.getElementById('session-total').textContent = totalPackets;
+        document.getElementById('session-threats').textContent = totalThreats;
+        document.getElementById('session-safe').textContent = totalSafe;
+
+        // Update Chart
+        const timeLabel = packet.timestamp;
+        chartData.labels.push(timeLabel);
+        
+        // Threat intensity = confidence if threat, else small random noise
+        const intensity = packet.is_threat ? packet.confidence : Math.random() * 10;
+        chartData.datasets[0].data.push(intensity);
+        chartData.datasets[1].data.push(Math.random() * 20 + 40); // Baseline traffic
+
+        if (chartData.labels.length > 20) {
+            chartData.labels.shift();
+            chartData.datasets[0].data.shift();
+            chartData.datasets[1].data.shift();
+        }
+        liveChart.update('none');
+    }
+
+    function clearFeed() {
+        document.getElementById('live-feed-body').innerHTML = '';
+        totalPackets = 0;
+        totalThreats = 0;
+        totalSafe = 0;
+        updateStats({is_threat: false, timestamp: '--:--:--', confidence: 0}); // reset counters
+        totalPackets = 0; // force reset after previous call
+        document.getElementById('session-total').textContent = 0;
+        document.getElementById('session-threats').textContent = 0;
+        document.getElementById('session-safe').textContent = 0;
+    }
+
+    // Polling logic
+    function fetchPacket() {
+        fetch('/api/live_packet')
+            .then(res => res.json())
+            .then(packet => {
+                addFeedRow(packet);
+                updateStats(packet);
+                
+                // Random interval between 1-3 seconds
+                const nextInterval = Math.random() * 2000 + 1000;
+                setTimeout(fetchPacket, nextInterval);
+            })
+            .catch(err => {
+                console.error("Live fetch error:", err);
+                setTimeout(fetchPacket, 5000); // retry after 5s
+            });
+    }
+
+    // CSS for animation
+    const style = document.createElement('style');
+    style.innerHTML = `
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); background: var(--accent-soft); }
+            to { opacity: 1; transform: translateY(0); background: transparent; }
+        }
+    `;
+    document.head.appendChild(style);
+
+    // Start monitoring
+    setTimeout(fetchPacket, 1000);
+</script>
+{% endblock %}
