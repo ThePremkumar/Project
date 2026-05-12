@@ -105,7 +105,7 @@
 </div>
 
 <!-- Analysis Pipeline Stepper -->
-<div class="stepper">
+<div class="stepper section-spacing">
   <div class="step complete">
     <div class="step-circle"><i class="fas fa-check"></i></div>
     <div class="step-label">Upload</div>
@@ -124,70 +124,71 @@
   </div>
 </div>
 
-<div class="row g-4">
+<div class="row g-4 section-spacing">
   <div class="col-12 col-lg-8">
-    <div class="card">
-      <div class="card-header">
+    <div class="card h-100">
+      <div class="mb-4">
         <span class="card-label">Data Input</span>
-        <h3 class="card-title">Traffic Log Upload</h3>
+        <h3 class="card-title mb-0">Traffic Log Upload</h3>
       </div>
       
       <form method="POST" enctype="multipart/form-data" id="upload-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="upload-container" id="drop-zone" onclick="document.getElementById('csv-input').click()">
           <i class="fas fa-cloud-arrow-up upload-icon"></i>
-          <h3>Drop CSV here or click to browse</h3>
-          <p class="text-muted mb-0">Accepts CIC-IDS 2017 or NSL-KDD formatted CSV files</p>
-          <div id="file-name" class="mt-3 text-accent font-monospace" style="display:none;">
+          <h3 class="mb-2">Drop CSV/PCAP here or click to browse</h3>
+          <p class="text-muted mb-0 px-4">Accepts CIC-IDS 2017, NSL-KDD CSVs, or raw PCAP files for security auditing.</p>
+          <div id="file-name" class="mt-4 p-3 bg-light rounded border border-dashed text-primary font-monospace" style="display:none;">
             <i class="fas fa-file-csv me-2"></i><span id="file-name-text"></span>
           </div>
         </div>
-        <input type="file" name="csv_file" id="csv-input" accept=".csv" style="display:none;" onchange="showFileName(this)">
+        <input type="file" name="csv_file" id="csv-input" accept=".csv,.pcap" style="display:none;" onchange="showFileName(this)">
         
         <div id="analysis-progress" class="mt-4" style="display:none;">
           <div class="d-flex justify-content-between mb-2">
-            <span class="label-caption"><i class="fas fa-spinner fa-spin me-2"></i>Processing Data...</span>
-            <span class="label-caption" id="progress-percent">0%</span>
+            <span class="label-caption fw-bold text-primary"><i class="fas fa-spinner fa-spin me-2"></i>Analyzing Packets...</span>
+            <span class="label-caption fw-bold text-primary" id="progress-percent">0%</span>
           </div>
-          <div class="progress" style="height: 8px; background: var(--bg-elevated);">
+          <div class="progress" style="height: 10px; background: var(--bg-elevated); border-radius: 10px;">
             <div class="progress-bar" id="progress-anim" style="width: 0%; background: var(--accent);"></div>
           </div>
         </div>
 
-        <button type="submit" class="btn btn-primary w-100 mt-4" id="submit-btn" style="display:none; height: 48px;">
-          <i class="fas fa-magnifying-glass-chart"></i> Run Security Analysis
+        <button type="submit" class="btn btn-primary w-100 mt-4" id="submit-btn" style="display:none; height: 52px; font-size: 16px;">
+          <i class="fas fa-magnifying-glass-chart me-2"></i> Run Deep Analysis
         </button>
       </form>
     </div>
   </div>
 
   <div class="col-12 col-lg-4">
-    <div class="card">
-      <div class="card-header">
+    <div class="card h-100">
+      <div class="mb-4">
         <span class="card-label">Model Status</span>
-        <h3 class="card-title">Engine Intelligence</h3>
+        <h3 class="card-title mb-0">Engine Intelligence</h3>
       </div>
       <div class="mb-4">
-        <div class="d-flex justify-content-between mb-2">
-          <span class="text-sm">Model Type</span>
-          <span class="badge badge-info">Random Forest</span>
+        <div class="d-flex justify-content-between mb-3 py-2 border-bottom">
+          <span class="text-sm text-secondary">Model Type</span>
+          <span class="badge badge-info px-3">Random Forest</span>
         </div>
-        <div class="d-flex justify-content-between mb-2">
-          <span class="text-sm">Accuracy</span>
-          <span class="badge badge-safe">{{ model_status.accuracy_label }}</span>
+        <div class="d-flex justify-content-between mb-3 py-2 border-bottom">
+          <span class="text-sm text-secondary">Accuracy</span>
+          <span class="badge badge-safe px-3">{{ model_status.accuracy_label }}</span>
         </div>
-        <div class="d-flex justify-content-between mb-2">
-          <span class="text-sm">Status</span>
-          <span class="badge badge-{{ 'safe' if model_status.model_exists else 'warn' }}">
+        <div class="d-flex justify-content-between mb-3 py-2">
+          <span class="text-sm text-secondary">Status</span>
+          <span class="badge badge-{{ 'safe' if model_status.model_exists else 'warn' }} px-3">
             {{ 'Ready' if model_status.model_exists else 'Loading' }}
           </span>
         </div>
       </div>
-      <div class="label-caption mb-2">Expected Features</div>
+      <span class="card-label mb-3">Expected Features</span>
       <div class="d-flex flex-wrap gap-2">
         {% for c in ['protocol','service','flag','duration','src_bytes','dst_bytes'] %}
-        <span class="code-text px-2 py-1 bg-light rounded" style="font-size: 11px; border: 1px solid var(--border);">{{ c }}</span>
+        <span class="font-monospace text-xs px-2 py-1 bg-light rounded border border-light-subtle">{{ c }}</span>
         {% endfor %}
-        <span class="code-text px-2 py-1 bg-light rounded text-muted" style="font-size: 11px;">+36 more</span>
+        <span class="font-monospace text-xs px-2 py-1 bg-light rounded text-muted">+36 more</span>
       </div>
     </div>
   </div>
@@ -233,6 +234,9 @@
         <h3 class="card-title">Classification Table — {{ filename }}</h3>
       </div>
       <div class="d-flex gap-2">
+        <a href="{{ url_for('export_pdf') }}" class="btn btn-secondary py-1 px-3" style="font-size: 11px;">
+          <i class="fas fa-file-pdf"></i> EXPORT_PDF
+        </a>
         <span class="badge badge-safe">Safe: {{ summary.by_type.get('normal', 0) }}</span>
         {% for k,v in summary.by_type.items() %}
           {% if k != 'normal' %}
@@ -250,6 +254,7 @@
             <th>Classification</th>
             <th>Confidence</th>
             <th>Severity</th>
+            <th>Explanation (SHAP)</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -272,6 +277,11 @@
             </td>
             <td>
               <span class="badge badge-{{ row.severity|lower }}">{{ row.severity }}</span>
+            </td>
+            <td>
+              <span class="code-text" style="font-size: 10px; opacity: 0.8;" title="{{ row.explanation }}">
+                {{ row.explanation[:40] }}{{ '...' if row.explanation|length > 40 else '' }}
+              </span>
             </td>
             <td>
               {% if row.is_threat %}

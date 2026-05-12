@@ -10,37 +10,37 @@
   </div>
   <div class="page-header-actions">
     <a href="{{ url_for('export_logs') }}" class="btn btn-secondary">
-      <i class="fas fa-file-arrow-down"></i> Export CSV
+      <i class="fas fa-download"></i> Export CSV
     </a>
   </div>
 </div>
 
 <!-- Log Stats Tiles -->
-<div class="row g-4 mb-4">
+<div class="row g-4 section-spacing">
   <div class="col-6 col-md-3">
-    <div class="card card-info mb-0">
+    <div class="card h-100 mb-0">
       <span class="card-label">Database</span>
       <div class="metric-number">{{ logs_stats.total }}</div>
       <div class="text-xs text-muted">Total audit records</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card card-danger mb-0">
-      <span class="card-label">Threats</span>
+    <div class="card h-100 mb-0">
+      <span class="card-label text-danger">Threats</span>
       <div class="metric-number" style="color: var(--danger);">{{ logs_stats.threats }}</div>
       <div class="text-xs text-muted">Confirmed malicious</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card card-safe mb-0">
-      <span class="card-label">Safe</span>
+    <div class="card h-100 mb-0">
+      <span class="card-label text-safe">Safe</span>
       <div class="metric-number" style="color: var(--safe);">{{ logs_stats.safe }}</div>
       <div class="text-xs text-muted">Normal connections</div>
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="card card-warn mb-0">
-      <span class="card-label">Threat Rate</span>
+    <div class="card h-100 mb-0">
+      <span class="card-label text-warn">Threat Rate</span>
       <div class="metric-number" style="color: var(--warn);">{{ logs_stats.threat_pct }}%</div>
       <div class="text-xs text-muted">Global detection avg</div>
     </div>
@@ -48,17 +48,17 @@
 </div>
 
 <!-- Filters Card -->
-<div class="card">
-  <div class="card-header mb-3">
+<div class="card section-spacing">
+  <div class="card-header border-0 p-0 mb-4">
     <span class="card-label">Filter Data</span>
-    <h3 class="card-title">Search and Refine Logs</h3>
+    <h3 class="card-title mb-0">Search and Refine Logs</h3>
   </div>
-  <div class="row g-3">
+  <div class="row g-4">
     <div class="col-12 col-md-4">
-      <label class="form-label">Search</label>
+      <label class="form-label">Keyword Search</label>
       <div class="position-relative">
-        <i class="fas fa-search position-absolute" style="left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px;"></i>
-        <input type="text" id="search" class="form-control" style="padding-left: 36px;" placeholder="Search file, type, timestamp..." oninput="filterTable()">
+        <i class="fas fa-search position-absolute" style="left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px;"></i>
+        <input type="text" id="search" class="form-control" style="padding-left: 40px;" placeholder="Search file, type, timestamp..." oninput="filterTable()">
       </div>
     </div>
     <div class="col-6 col-md-2">
@@ -91,22 +91,22 @@
       </select>
     </div>
     <div class="col-6 col-md-2 d-flex align-items-end">
-      <button class="btn btn-secondary w-100" onclick="clearFilters()">
-        <i class="fas fa-xmark"></i> Clear
+      <button class="btn btn-secondary w-100" style="height: 42px;" onclick="clearFilters()">
+        <i class="fas fa-xmark me-1"></i> Clear
       </button>
     </div>
   </div>
 </div>
 
 <!-- Logs Table Card -->
-<div class="card">
-  <div class="card-header d-flex flex-row justify-content-between align-items-center">
+<div class="card p-0 overflow-hidden">
+  <div class="p-4 border-bottom d-flex flex-row justify-content-between align-items-center">
     <div>
       <span class="card-label">Audit Table</span>
-      <h3 class="card-title">Detection Log History</h3>
+      <h3 class="card-title mb-0">Detection Log History</h3>
     </div>
     <div class="text-xs text-muted">
-      Showing <span id="visible-count" class="text-primary font-weight-bold">{{ logs|length }}</span> of {{ logs|length }} loaded records
+      Showing <span id="visible-count" class="text-primary fw-bold">{{ logs|length }}</span> of {{ logs|length }} loaded records
     </div>
   </div>
   
@@ -114,12 +114,12 @@
     <table class="table" id="logs-table">
       <thead>
         <tr>
-          <th>ID</th>
+          <th style="padding-left: 24px;">ID</th>
           <th>Source File</th>
           <th>Type</th>
           <th>Confidence</th>
           <th>Severity</th>
-          <th>Timestamp</th>
+          <th style="padding-right: 24px;">Timestamp</th>
         </tr>
       </thead>
       <tbody>
@@ -128,9 +128,9 @@
             data-pred="{{ row.prediction }}"
             data-threat="{{ '1' if row.is_threat else '0' }}"
             data-severity="{{ row.severity|lower }}">
-          <td class="code-text">#{{ row.log_id }}</td>
+          <td style="padding-left: 24px;" class="font-monospace text-xs">#{{ row.log_id }}</td>
           <td class="text-truncate" style="max-width: 150px;" title="{{ row.filename }}">
-            <i class="fas fa-file-csv me-1 opacity-50"></i>{{ row.filename or '—' }}
+            <i class="fas fa-file-csv me-2 opacity-50"></i>{{ row.filename or '—' }}
           </td>
           <td>
             <span class="badge {{ 'badge-danger' if row.is_threat else 'badge-safe' }}">
@@ -139,16 +139,16 @@
           </td>
           <td>
             <div class="d-flex align-items-center gap-2">
-              <div class="progress" style="width: 60px; height: 4px; background: var(--bg-elevated);">
+              <div class="progress" style="width: 60px; height: 6px; background: var(--bg-elevated); border-radius: 10px;">
                 <div class="progress-bar" style="width: {{ row.confidence }}%; background: {{ 'var(--danger)' if row.is_threat else 'var(--safe)' }};"></div>
               </div>
-              <span class="code-text">{{ row.confidence }}%</span>
+              <span class="font-monospace text-xs">{{ row.confidence }}%</span>
             </div>
           </td>
           <td>
             <span class="badge badge-{{ row.severity|lower }}">{{ row.severity }}</span>
           </td>
-          <td class="code-text">{{ row.timestamp }}</td>
+          <td style="padding-right: 24px;" class="font-monospace text-xs text-muted">{{ row.timestamp }}</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -35,6 +35,7 @@
         <h3 class="card-title">Update Password</h3>
       </div>
       <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label class="form-label">Current Password</label>
           <input type="password" name="current_pw" class="form-control" required placeholder="••••••••">

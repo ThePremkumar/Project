@@ -13,10 +13,12 @@ HOW TO USE CIC-IDS 2017:
   5. Restart python app.py    (auto-detects and trains on CIC-IDS)
 """
 import os, pickle, numpy as np, pandas as pd
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from xgboost import XGBClassifier
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
+import shap
 import warnings; warnings.filterwarnings('ignore')
 
 # ── Paths ──────────────────────────────────────────────────────────────────
@@ -166,17 +168,25 @@ def load_cicids(cicids_dir=CICIDS_DIR, max_per_file=50000):
 
 class ThreatDetector:
     def __init__(self):
-        self.rf  = RandomForestClassifier(
-            n_estimators=150, max_depth=20,
-            class_weight="balanced", random_state=42, n_jobs=-1
+        # Base XGBoost model
+        self.base_model = XGBClassifier(
+            n_estimators=200, 
+            max_depth=6, 
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=42,
+            n_jobs=-1,
+            tree_method="hist", # Efficient for larger datasets
+            eval_metric="mlogloss"
         )
-        self.gb  = GradientBoostingClassifier(
-            n_estimators=80, learning_rate=0.1, max_depth=5, random_state=42
-        )
+        # Wrap in calibration for better probability estimates
+        self.model         = None
         self.scaler        = StandardScaler()
         self.encoders      = {}
         self.le            = LabelEncoder()
         self.feature_names = []
+        self.explainer     = None
         self.fitted        = False
         self.dataset_type  = "synthetic"
 
@@ -269,6 +279,9 @@ class ThreatDetector:
         self.dataset_type = dataset_type
         print(f"[model] Dataset      : {dataset_type}")
         print(f"[model] Training rows: {len(df):,}")
+        
+        # Remove null labels
+        df = df.dropna(subset=[label_col])
         print(f"[model] Classes      : {df[label_col].value_counts().to_dict()}")
 
         X = self._get_X(df, fit=True)
@@ -277,13 +290,19 @@ class ThreatDetector:
         X_tr, X_val, y_tr, y_val = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y
         )
-        print("[model] Fitting Random Forest …")
-        self.rf.fit(X_tr, y_tr)
-        print("[model] Fitting Gradient Boosting …")
-        self.gb.fit(X_tr, y_tr)
+        
+        print("[model] Fitting Calibrated XGBoost …")
+        self.model = CalibratedClassifierCV(self.base_model, method="sigmoid", cv=3)
+        self.model.fit(X_tr, y_tr)
+        
+        print("[model] Initializing SHAP Explainer …")
+        # We explain the underlying calibrated model's first estimator for speed
+        # or use a representative sample
+        self.explainer = shap.Explainer(self.model.calibrated_classifiers_[0].estimator, X_tr[:100])
+        
         self.fitted = True
 
-        preds  = self._vote(X_val)
+        preds  = self.model.predict(X_val)
         acc    = accuracy_score(y_val, preds)
         report = classification_report(
             y_val, preds, target_names=self.le.classes_, zero_division=0
@@ -291,18 +310,42 @@ class ThreatDetector:
         self.save()
         return acc, report
 
-    def _vote(self, X):
-        p1 = self.rf.predict_proba(X)
-        p2 = self.gb.predict_proba(X)
-        return np.argmax((p1 + p2) / 2, axis=1)
+    def _get_shap_explanations(self, X):
+        """Generates top feature contributions for a set of samples."""
+        explainer = getattr(self, 'explainer', None)
+        if explainer is None: return ["N/A"] * len(X)
+        try:
+            shap_values = explainer(X)
+            # shap_values.values is [n_samples, n_features, n_classes]
+            explanations = []
+            for i in range(len(X)):
+                # Get importance for the predicted class
+                # (simplified: just use absolute mean across all features)
+                # For multiclass SHAP, values are per class. 
+                # We'll just take the max contributing features across all features
+                if len(shap_values.values.shape) == 3:
+                    # Multi-class: sum across classes or pick current?
+                    # Let's just pick the absolute max feature impact
+                    sv = np.abs(shap_values.values[i]).mean(axis=1)
+                else:
+                    sv = np.abs(shap_values.values[i])
+                
+                top_idx = np.argsort(sv)[-3:][::-1]
+                parts = [f"{self.feature_names[j]} ({sv[j]:.2f})" for j in top_idx if sv[j] > 0]
+                explanations.append(", ".join(parts) if parts else "No significant features")
+            return explanations
+        except:
+            return ["Explanation Failed"] * len(X)
 
     # ── predict ────────────────────────────────────────────────────────────
     def predict_df(self, df):
-        assert self.fitted, "Model not trained yet"
+        if not getattr(self, 'fitted', False) or not hasattr(self, 'model'):
+            raise RuntimeError("Model is not fitted or is incompatible. Please retrain.")
+            
         X      = self._get_X(df, fit=False)
-        idx    = self._vote(X)
-        avg_p  = (self.rf.predict_proba(X) + self.gb.predict_proba(X)) / 2
-        conf   = np.max(avg_p, axis=1)
+        idx    = self.model.predict(X)
+        probs  = self.model.predict_proba(X)
+        conf   = np.max(probs, axis=1)
         labels = self.le.inverse_transform(idx)
 
         out = df.copy()
@@ -311,6 +354,10 @@ class ThreatDetector:
         out["severity"]    = [SEVERITY.get(l, "Unknown") for l in labels]
         out["badge_color"] = [COLOR.get(l, "secondary")  for l in labels]
         out["is_threat"]   = out["prediction"] != "normal"
+        
+        # Add SHAP explanations
+        out["explanation"] = self._get_shap_explanations(X)
+        
         return out
 
     # ── save / load ────────────────────────────────────────────────────────

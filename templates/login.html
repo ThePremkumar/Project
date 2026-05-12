@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Secure Login{% endblock %}
+{% block title %}Terminal Access{% endblock %}
 {% block content %}
 <style>
   body {
-    background-color: var(--bg-elevated);
+    background-color: var(--bg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -15,72 +15,130 @@
     display: flex;
     width: 100%;
     max-width: 900px;
-    background: var(--bg-surface);
-    border-radius: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
     overflow: hidden;
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--shadow-lg), 0 0 40px rgba(0, 255, 209, 0.05);
     margin: 24px;
+    position: relative;
+  }
+
+  .auth-container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
   }
 
   .auth-side-panel {
     flex: 1;
-    background: linear-gradient(135deg, var(--accent) 0%, #7C3AED 100%);
+    background: #000;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 48px;
-    color: var(--text-inverse);
+    color: var(--text);
     text-align: center;
+    position: relative;
+    border-right: 1px solid var(--border);
   }
 
   .auth-side-panel i {
     font-size: 64px;
     margin-bottom: 24px;
+    color: var(--accent);
+    text-shadow: var(--glow-teal);
   }
 
   .auth-side-panel h1 {
-    color: var(--text-inverse);
+    font-family: var(--font-mono);
+    color: var(--accent);
     font-size: var(--text-3xl);
     margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
   }
 
   .auth-side-panel p {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: var(--text-base);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    font-family: var(--font-mono);
+    max-width: 240px;
   }
 
   .auth-form-panel {
-    width: 480px;
-    padding: 48px;
+    width: 440px;
+    padding: 60px 48px;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    background: var(--surface);
   }
 
   .auth-form-panel h2 {
+    font-family: var(--font-mono);
     margin-bottom: 8px;
+    color: var(--text);
+    font-size: var(--text-xl);
   }
 
   .auth-form-panel p {
     color: var(--text-muted);
     margin-bottom: 32px;
+    font-size: var(--text-sm);
   }
 
   .demo-account {
-    background: var(--info-soft);
-    border: 1px solid var(--info);
-    border-radius: 8px;
-    padding: 12px;
-    margin-top: 24px;
-    font-size: var(--text-sm);
-    color: var(--info);
+    background: rgba(0, 255, 209, 0.03);
+    border: 1px solid rgba(0, 255, 209, 0.1);
+    border-radius: 4px;
+    padding: 16px;
+    margin-top: 32px;
+    font-size: var(--text-xs);
+    color: var(--accent);
+    font-family: var(--font-mono);
+  }
+
+  .form-control {
+    background: #000;
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    border-radius: 2px;
+  }
+
+  .form-control:focus {
+    background: #050505;
+    border-color: var(--accent);
+    box-shadow: 0 0 10px rgba(0, 255, 209, 0.1);
+    color: var(--accent);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    border-radius: 2px;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #000;
+  }
+
+  .btn-primary:hover {
+    background: #fff;
+    box-shadow: var(--glow-teal);
+    color: #000;
   }
 
   @media (max-width: 768px) {
     .auth-side-panel { display: none; }
-    .auth-container { max-width: 480px; }
-    .auth-form-panel { width: 100%; padding: 32px; }
+    .auth-container { max-width: 440px; }
+    .auth-form-panel { width: 100%; padding: 40px 24px; }
   }
 </style>
 
@@ -88,20 +146,21 @@
   <div class="auth-side-panel">
     <i class="fas fa-shield-halved"></i>
     <h1>CyberSentinel</h1>
-    <p>Intelligent Cyber Threat Detection System powered by Advanced Machine Learning.</p>
+    <p>ICTDS v3.0 — CORE SECURITY NODE</p>
   </div>
   <div class="auth-form-panel">
-    <h2>Welcome Back</h2>
-    <p>Enter your credentials to access the system.</p>
+    <h2>SYSTEM ACCESS</h2>
+    <p>IDENTIFY YOURSELF TO PROCEED</p>
 
     <form method="POST" id="login-form">
-      <div class="form-group">
-        <label class="form-label">Username</label>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group mb-3">
+        <label class="form-label text-muted" style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">User ID</label>
         <input type="text" name="username" id="username" class="form-control" required 
-               placeholder="Enter your username" autocomplete="username">
+               placeholder="IDENTIFIER" autocomplete="username">
       </div>
-      <div class="form-group">
-        <label class="form-label">Password</label>
+      <div class="form-group mb-4">
+        <label class="form-label text-muted" style="font-size: 10px; text-transform: uppercase; letter-spacing: 1px;">Access Key</label>
         <div class="position-relative">
           <input type="password" name="password" id="password" class="form-control" required 
                  placeholder="••••••••" autocomplete="current-password">
@@ -111,19 +170,19 @@
           </button>
         </div>
       </div>
-      <button type="submit" class="btn btn-primary w-100" id="login-btn">
-        <i class="fas fa-right-to-bracket"></i> Sign In
+      <button type="submit" class="btn btn-primary w-100 py-3" id="login-btn">
+        AUTHENTICATE
       </button>
     </form>
 
     <div class="text-center mt-4">
-      <span style="font-size: var(--text-sm); color: var(--text-muted);">Don't have an account?</span>
-      <a href="{{ url_for('register') }}" style="color: var(--accent); font-weight: var(--weight-semibold); text-decoration: none; font-size: var(--text-sm);">Request Access</a>
+      <span style="font-size: var(--text-xs); color: var(--text-muted);">NEW ANALYST?</span>
+      <a href="{{ url_for('register') }}" style="color: var(--accent); font-weight: bold; text-decoration: none; font-size: var(--text-xs); margin-left: 8px;">REQUEST PERMISSION</a>
     </div>
 
     <div class="demo-account">
-      <i class="fas fa-info-circle me-1"></i>
-      <strong>Demo Account:</strong> admin / admin123
+      <div class="mb-1" style="opacity: 0.7;">>_ SIMULATION_CREDENTIALS</div>
+      <div><strong>ADMIN:</strong> admin / admin123</div>
     </div>
   </div>
 </div>
@@ -140,7 +199,7 @@ function togglePw(id, btn) {
 
 document.getElementById('login-form').addEventListener('submit', function() {
   const btn = document.getElementById('login-btn');
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AUTHENTICATING...';
   btn.disabled = true;
 });
 </script>

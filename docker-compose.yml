@@ -1,0 +1,25 @@
+services:
+  app:
+    build: .
+    ports:
+      - "5001:5001"
+    environment:
+      - ICTDS_SECRET_KEY=${ICTDS_SECRET_KEY:-ictds-secret-v3-prod}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+    volumes:
+      - ./data:/app/data
+      - ./model:/app/model
+      - ./ictds.db:/app/ictds.db
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+volumes:
+  ictds_db:

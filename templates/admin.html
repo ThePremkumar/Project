@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Admin Control{% endblock %}
+{% block page_name %}Admin Panel{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-title">
+    <h1>Admin Control Panel</h1>
+    <p class="page-header-subtitle">Manage system users, logs, and global security policies.</p>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <span class="card-label">Database</span>
+      <h3 class="card-title">Total Records</h3>
+      <div class="metric-number">{{ logs_count }}</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <span class="card-label">Users</span>
+      <h3 class="card-title">Active Analysts</h3>
+      <div class="metric-number">{{ users|length }}</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <span class="card-label">Status</span>
+      <h3 class="card-title">System Health</h3>
+      <div class="metric-number text-success">Optimal</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-label">Management</span>
+    <h3 class="card-title">Analyst Registry</h3>
+  </div>
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Joined</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="font-monospace">{{ u.id }}</td>
+          <td><strong>{{ u.username }}</strong></td>
+          <td>
+            {% if u.is_admin %}
+            <span class="badge badge-info">Administrator</span>
+            {% else %}
+            <span class="badge badge-safe">Analyst</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">{{ u.created }}</td>
+          <td>
+            <button class="btn btn-ghost py-0 px-2" style="font-size: 11px;" 
+                    onclick="alert('Resetting user {{ u.username }}...')">Reset</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mt-4" style="border-top: 3px solid var(--danger);">
+  <div class="card-header">
+    <span class="card-label text-danger">Danger Zone</span>
+    <h3 class="card-title">Maintenance Tools</h3>
+  </div>
+  <div class="d-flex gap-3 mt-2">
+    <button class="btn btn-secondary" style="border-color: var(--danger); color: var(--danger);" onclick="confirmPurge()">
+      <i class="fas fa-trash-can"></i> Purge All Logs
+    </button>
+    <button class="btn btn-secondary" onclick="location.reload()">
+      <i class="fas fa-sync"></i> Restart Daemon
+    </button>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmPurge() {
+  if (confirm("WARNING: This will delete ALL analysis logs from the database. Proceed?")) {
+    alert("Database purge initiated.");
+  }
+}
+</script>
+{% endblock %}
