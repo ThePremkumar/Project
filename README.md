@@ -1,8 +1,8 @@
 # CyberSentinel — Intelligent Cyber Threat Detection System
 
-> **ICTDS v2.0** · Machine Learning · Flask · SQLite · CIC-IDS 2017 · "Void Terminal" UI
+> **ICTDS v3.0** · Machine Learning · Flask · SocketIO · "Clinical Clarity" UI
 
-An end-to-end web-based cybersecurity platform that detects and classifies malicious network activity using a dual-model machine learning ensemble. Users upload network traffic logs (CSV), receive instant threat classifications with severity scoring, and monitor security trends through a real-time interactive dashboard with a premium **"Void Terminal"** dark aesthetic.
+An enterprise-grade cybersecurity platform that detects and classifies malicious network activity using an explainable ML ensemble. It features real-time traffic monitoring, deep-packet analysis, and professional forensic reporting with a high-contrast **"Clinical Clarity"** light-mode aesthetic designed for security operations centers.
 
 ---
 
@@ -10,18 +10,15 @@ An end-to-end web-based cybersecurity platform that detects and classifies malic
 
 | Feature | Description |
 |---|---|
-| 🤖 **ML Ensemble** | Random Forest + Gradient Boosting voting classifier |
+| 🤖 **Explainable ML** | XGBoost + Calibrated Classifier with SHAP feature importance |
+| 📡 **Live Monitor** | Real-time packet simulation and classification via SocketIO |
 | 📊 **Real Dataset Support** | Natively trains on CIC-IDS 2017 (~97% accuracy) |
-| 🧪 **Synthetic Fallback** | Auto-generates NSL-KDD style data if no dataset found |
-| 🔐 **User Authentication** | Secure login & registration with SHA-256 hashing |
-| 📁 **CSV Upload & Analysis** | Drag-and-drop file upload with ML-based real-time classification |
-| 📈 **Live Dashboard** | 24-hour timeline chart, metric cards, top threats ranking, activity feed |
-| ⚠️ **Threat Intelligence Page** | Dedicated threat report with type breakdown, severity heatmap & pagination |
-| 📋 **Detection Logs** | 4-filter searchable audit trail (type, status, severity, text) with CSV export |
-| 🔄 **Model Retraining** | One-click retrain from the dashboard |
-| 📥 **Sample CSV Download** | Pre-built sample from real or synthetic data |
-| 📡 **REST API** | JSON endpoints for stats, timeline, severity, attack types |
-| 🎨 **"Void Terminal" UI** | Space Mono + Outfit fonts, neon teal/coral palette, scanline texture, animated sidebar |
+| 🧪 **Synthetic Fallback** | Auto-generates high-fidelity traffic data if no dataset found |
+| 🔐 **Admin RBAC** | Dedicated administrative panel for user and log management |
+| 📄 **Forensic Reports** | Professional PDF export for incident documentation (ReportLab) |
+| 📈 **Interactive Dash** | Real-time telemetry, 24h threat timeline, and classification mix |
+| 📋 **Security Audit** | Advanced filterable audit trail with CSV export and responsive layout |
+| 🎨 **Clinical Clarity UI** | Professional light-mode aesthetic using Inter and JetBrains Mono |
 
 ---
 
@@ -29,12 +26,12 @@ An end-to-end web-based cybersecurity platform that detects and classifies malic
 
 | Layer | Technology |
 |---|---|
-| **Backend** | Python 3.8+, Flask 3.x |
-| **Machine Learning** | scikit-learn (Random Forest, Gradient Boosting), pandas, NumPy |
-| **Database** | SQLite (via Python `sqlite3`) |
-| **Frontend** | HTML5, Vanilla CSS3, JavaScript (ES6+), Bootstrap 5, Chart.js 4 |
-| **Fonts & Icons** | Google Fonts (Space Mono, Outfit), Font Awesome 6 |
-| **Model Storage** | Pickle (`.pkl`) |
+| **Backend** | Python 3.10+, Flask 3.x, Flask-SocketIO |
+| **Machine Learning** | XGBoost, SHAP, scikit-learn, pandas, NumPy |
+| **Forensics** | ReportLab (PDF), Scapy (PCAP Processing) |
+| **Database** | SQLite3 (Persistent storage) |
+| **Frontend** | HTML5, CSS3 (Vanilla), JS (ES6+), Chart.js 4 |
+| **Typography** | Inter (UI), JetBrains Mono (Data) |
 
 ---
 
@@ -109,7 +106,7 @@ By default the system trains on synthetic data (~79% accuracy). For production-g
    ```
 5. Restart the app — it auto-detects the dataset, trains both models, and saves `model.pkl`
 
-The dashboard subtitle will show **CIC-IDS 2017 Dataset · ~97% Accuracy** once loaded.
+The dashboard status will indicate **CIC-IDS 2017 Dataset · ~97% Accuracy** when initialized.
 
 ---
 
@@ -127,10 +124,10 @@ The dashboard subtitle will show **CIC-IDS 2017 Dataset · ~97% Accuracy** once 
 | `/analyse` | GET, POST | Upload CSV and run threat classification |
 | `/threats` | GET | Dedicated threat intelligence report with pagination |
 | `/logs` | GET | Filterable detection audit trail with CSV export |
-| `/demo` | GET | Analyses 20 synthetic packets instantly |
-| `/sample_csv` | GET | Downloads a sample input CSV |
-| `/retrain` | POST | Deletes model and retrains from scratch |
-| `/export_logs` | GET | Downloads all user logs as timestamped CSV |
+| `/monitor` | GET | Real-time streaming packet sniffer (Live Monitor) |
+| `/admin` | GET | Administrative dashboard for RBAC and log maintenance |
+| `/export_pdf` | GET | Generates forensic incident report in PDF format |
+| `/export_logs` | GET | Downloads filter-refined logs as CSV |
 
 ### REST API Endpoints
 
@@ -176,35 +173,33 @@ ictds/
 │   └── model.pkl           # Serialized ensemble model (auto-generated)
 │
 ├── templates/              # Jinja2 HTML templates
-│   ├── base.html           # Shared layout — sidebar, nav, design system
-│   ├── login.html          # Terminal-window login page
-│   ├── register.html       # Registration with password strength meter
-│   ├── dashboard.html      # Timeline, top threats, activity feed, metrics
-│   ├── analyse.html        # CSV upload & pipeline results
-│   ├── threats.html        # Dedicated threat intelligence report (NEW)
-│   └── logs.html           # Filterable detection log with export
+│   ├── base.html           # Professional light-mode layout & sidebar
+│   ├── login.html          # Clean authentication interface
+│   ├── dashboard.html      # Real-time telemetry & security KPIs
+│   ├── analyse.html        # Multi-step traffic classification pipeline
+│   ├── threats.html        # Detailed threat intelligence report
+│   ├── monitor.html        # Live SocketIO traffic stream (NEW)
+│   ├── admin.html          # Administrative user management (NEW)
+│   └── logs.html           # Advanced searchable detection audit trail
 │
 └── venv/                   # Python virtual environment (not committed)
 ```
 
 ---
 
-## 🎨 UI Design System — "Void Terminal"
+## 🎨 UI Design System — "Clinical Clarity"
 
-The frontend follows a **neo-brutalist terminal aesthetic** defined in `SKILL.md`:
+The frontend adheres to a high-contrast, professional light-mode design:
 
 | Token | Value | Usage |
 |---|---|---|
-| `--bg` | `#07090F` | Page background |
-| `--accent` | `#00FFD1` | Electric teal — primary actions |
-| `--danger` | `#FF3366` | Coral red — threats & alerts |
-| `--warn` | `#FF9500` | Amber — medium severity |
-| `--safe` | `#00E5A0` | Green — safe traffic |
-| **Font (Display)** | `Space Mono` | Numbers, labels, mono data |
-| **Font (Body)** | `Outfit` | UI text, headings |
-| **Effect** | Scanline texture | CSS repeating-linear-gradient overlay |
-| **Effect** | Animated grid | CSS background drift animation |
-| **Effect** | Glowing blobs | Blurred radial gradients at corners |
+| `--bg` | `#F4F6FB` | Global background |
+| `--accent` | `#0066FF` | Corporate Blue — primary actions |
+| `--danger` | `#E8003D` | Alert Red — threat detection |
+| `--safe` | `#00875A` | Success Green — clean traffic |
+| `--text-primary`| `#0D1117` | High-contrast body text |
+| **Font (Body)** | `Inter` | User interface and headings |
+| **Font (Mono)** | `JetBrains Mono` | Forensic data and code views |
 
 ---
 
@@ -230,18 +225,19 @@ scikit-learn>=1.3.0
 
 ## 📋 Changelog
 
+### v3.0 — May 2026
+- 🎨 **Redesigned** complete UI to "Clinical Clarity" Light Mode for professional SOC environments.
+- ✨ **Added** Live Monitor page using SocketIO for real-time traffic visualization.
+- ✨ **Added** Forensic PDF Exporting using ReportLab for official incident reporting.
+- ✨ **Added** Administrative Panel with RBAC (Role-Based Access Control).
+- ✨ **Added** SHAP integration for ML feature importance and model explainability.
+- ✨ **Added** XGBoost optimized engine replacing standard Gradient Boosting.
+- 📱 **Refined** Mobile responsiveness across all data-heavy components.
+- 🔧 **Improved** Database transaction stability with explicit commits.
+
 ### v2.0 — May 2026
-- ✅ **Fixed** threat count mismatch between dashboard and detection logs (moved to server-side SQL COUNT)
-- ✨ **Added** Threat Intelligence page (`/threats`) with pagination, attack type bars, severity breakdown
-- ✨ **Added** 24-hour threat timeline chart (live from `/api/threat_timeline`)
-- ✨ **Added** Top Threats ranking panel on dashboard
-- ✨ **Added** Live activity feed on dashboard
-- ✨ **Added** Threat alert banner when threats detected
-- ✨ **Added** 4 new REST API endpoints (`threat_timeline`, `severity_dist`, `attack_types`, `recent_critical`)
-- ✨ **Added** "Threats" navigation item with live badge count in sidebar
-- 🎨 **Redesigned** all pages with "Void Terminal" aesthetic (Space Mono, Outfit, neon palette, scanlines)
-- 🎨 **Redesigned** login/register with terminal window chrome + cursor blink animation
-- 🎨 **Redesigned** analyse page with 4-step pipeline visualization
+- ✅ **Fixed** threat count mismatch between dashboard and detection logs.
+- ✨ **Added** Threat Intelligence page with pagination and severity heatmap.
 
 ### v1.0 — April 2026
 - Initial release with dashboard, analyse, logs, login, register
